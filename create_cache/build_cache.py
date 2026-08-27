@@ -15,7 +15,7 @@ import sqlite3
 
 import httpx
 
-from edhrec_raw import COLOR_IDENTITIES, fetch_average_deck, fetch_commanders_by_identity
+from edhrec_raw import COLOR_IDENTITIES, fetch_average_deck, fetch_commanders_by_identity, normalize_identity
 from create_commander_json import create_commander_json
 
 DB_PATH = "../cache.sqlite"
@@ -105,9 +105,10 @@ async def main():
         print(f"{len(eligible)} commanders meet the {MIN_DECKS}-deck threshold\n")
 
         for name, meta in eligible.items():
+            identity = normalize_identity(meta["identity"])
             conn.execute(
                 "INSERT OR REPLACE INTO commanders (name, identity, num_decks) VALUES (?, ?, ?)",
-                (name, meta["identity"], meta["num_decks"]),
+                (name, identity, meta["num_decks"]),
             )
         conn.commit()
 

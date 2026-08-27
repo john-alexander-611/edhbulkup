@@ -10,7 +10,7 @@ Only Count and Name matter for deck matching. Everything else (edition,
 condition, foil, etc.) is ignored - the same card in two different sets
 or foil/non-foil both just count as "you own this card".
 """
-
+#TODO: create a collection class with different input methods
 import csv
 from collections import defaultdict
 

@@ -17,7 +17,7 @@ def create_commander_json():
     for name, identity, card_name in conn.execute(query):
         if name not in commander_data:
             commander_data[name] = {
-                "identity": set(identity),
+                "identity": identity,
                 "decklist": set()
             }
 
@@ -28,7 +28,7 @@ def create_commander_json():
     # Convert sets to lists for JSON
     json_data = {
         commander: {
-            "identity": list(data["identity"]),
+            "identity": data["identity"],
             "decklist": list(data["decklist"])
         }
         for commander, data in commander_data.items()
@@ -37,3 +37,5 @@ def create_commander_json():
     with open("commander_data.json", "w") as f:
         json.dump(json_data, f, indent=2)
         print("\ncommander_data.json write completed")
+
+

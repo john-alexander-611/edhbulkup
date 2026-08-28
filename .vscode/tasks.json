@@ -1,0 +1,11 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "inspect commander",
+            "type": "shell",
+            "command": "python ./inspect_commander.py",
+            "inAgents": true
+        }
+    ]
+}

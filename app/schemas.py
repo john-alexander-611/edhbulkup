@@ -1,0 +1,44 @@
+from __future__ import annotations
+
+from pydantic import BaseModel, Field
+
+
+class SearchQuery(BaseModel):
+    color: str | None = Field(default=None, description="Optional color identity filter, e.g. WUB")
+    exclude: str | None = Field(default=None, description="Optional excluded colors, e.g. UB")
+    limit: int = Field(default=10, ge=1, le=50)
+
+
+class DeckMatchResponse(BaseModel):
+    commander_name: str
+    identity: str
+    match_score: float
+    match_percentage: float
+    owned_count: int
+    deck_size: int
+
+
+class ReplacementGroupResponse(BaseModel):
+    tag: str
+    missing_cards: list[str]
+    replacements: list[str]
+
+
+class DeckAnalysisResponse(BaseModel):
+    commander_name: str
+    identity: str
+    match_score: float
+    match_percentage: float
+    owned_count: int
+    missing_count: int
+    missing_cards: list[str]
+    missing_by_tag: dict[str, list[str]]
+    replacements_by_tag: list[ReplacementGroupResponse] = []
+    owned_synergy_cards: list[str] = []
+    same_type_replacements: dict[str, list[str]] = {}
+    warnings: list[str] = []
+
+
+class UploadCollectionResponse(BaseModel):
+    owned_count: int
+    sample_cards: list[str]

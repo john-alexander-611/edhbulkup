@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from create_cache.edhrec_raw import CARD_CATEGORY_TAGS
+from card_legality import is_card_legal_in_identity
 BASIC_LANDS = frozenset({"plains", "island", "swamp", "mountain", "forest"})
 
 
@@ -27,6 +28,19 @@ class Commander:
         tag = CARD_CATEGORY_TAGS.get(friendly_name, friendly_name)
         return self.categories.get(tag, [])
 
+    def get_all_edhrec_suggestions(self) -> dict[str, float]:
+        all_suggestions = {}
+
+        if self.categories is None:
+            raise ValueError(
+                f"{self.name}: categories not fetched yet - call set_categories() first"
+            )
+        for tag in CARD_CATEGORY_TAGS:
+            for card in self.categories.get(tag, []):
+                name = card["name"].lower()
+                all_suggestions[name] = card["synergy"]
+        return all_suggestions
+
     def contains_color(self, color: str) -> bool:
         return color in self.identity
 
@@ -43,3 +57,7 @@ class Commander:
 
     def missing_cards(self, owned_cards: set[str]) -> set[str]:
         return self.decklist - owned_cards
+
+    def is_card_legal(self, card_color_identity: str) -> bool:
+        return is_card_legal_in_identity(card_color_identity, self.identity)
+

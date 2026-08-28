@@ -1,6 +1,7 @@
 from find_deck_matches import get_decks
 from models.commander import Commander
 from scryfall.scryfall_api import get_card_type
+from scryfall.cache_wrappers import ScryfallCache, TagCache
 
 
 def get_missing_cards(commander_name: str, owned_cards: set[str]) -> set[str]:
@@ -74,3 +75,33 @@ def suggest_same_type_replacements_for_missing_cards(
 
     return suggestions
 
+
+def suggest_functional_replacements(
+    commander: Commander,
+    owned_cards: set[str],
+    scryfall_cache: ScryfallCache,
+    tag_cache: TagCache,
+) -> dict[str, list[str]]:
+    all_suggestions = commander.get_all_edhrec_suggestions()
+    suggestions = {}
+
+    for missing_card in commander.missing_cards(owned_cards):
+        tags = tag_cache.get_tags(missing_card)
+        candidates = set()
+        for tag in tags:
+            candidates |= tag_cache.get_cards_with_tag(tag)
+        legal_owned = [
+            c for c in (candidates & owned_cards & all_suggestions.keys())
+            if commander.is_card_legal(
+                scryfall_cache.get_color_identity(c) or ""
+            )
+        ]
+        # Sort by EDHREC synergy, highest first, then take 5
+        legal_owned.sort(
+            key=lambda card: all_suggestions[card],
+            reverse=True
+        )
+        if legal_owned:
+            suggestions[missing_card] = legal_owned[:5]
+
+    return suggestions

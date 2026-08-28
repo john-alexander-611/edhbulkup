@@ -32,11 +32,13 @@ def init_db(conn: sqlite3.Connection):
 
         CREATE TABLE cards (
             name TEXT PRIMARY KEY,
+            oracle_id TEXT,
             type_line TEXT,
             cmc REAL,
             mana_cost TEXT,
             color_identity TEXT
         );
+        CREATE INDEX idx_cards_oracle_id ON cards(oracle_id);
     """)
     conn.commit()
 
@@ -105,6 +107,7 @@ async def build_cache():
 
             batch.append((
                 normalize(name),
+                card.get("oracle_id"),
                 card.get("type_line"),
                 card.get("cmc"),
                 card.get("mana_cost"),
@@ -114,7 +117,7 @@ async def build_cache():
 
             if len(batch) >= BATCH_SIZE:
                 conn.executemany(
-                    "INSERT OR REPLACE INTO cards (name, type_line, cmc, mana_cost, color_identity) VALUES (?, ?, ?, ?, ?)",
+                    "INSERT OR REPLACE INTO cards (name, oracle_id, type_line, cmc, mana_cost, color_identity) VALUES (?, ?, ?, ?, ?, ?)",
                     batch,
                 )
                 conn.commit()
@@ -141,7 +144,7 @@ async def build_cache():
 
         if batch:
             conn.executemany(
-                "INSERT OR REPLACE INTO cards (name, type_line, cmc, mana_cost, color_identity) VALUES (?, ?, ?, ?, ?)",
+                "INSERT OR REPLACE INTO cards (name, oracle_id, type_line, cmc, mana_cost, color_identity) VALUES (?, ?, ?, ?, ?, ?)",
                 batch,
             )
             conn.commit()

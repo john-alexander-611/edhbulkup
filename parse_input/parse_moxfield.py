@@ -13,6 +13,7 @@ or foil/non-foil both just count as "you own this card".
 #TODO: create a collection class with different input methods
 import csv
 from collections import defaultdict
+from models.collection import Collection
 
 
 def normalize(name: str) -> str:
@@ -73,7 +74,7 @@ def parse_moxfield_csv(path_or_fileobj) -> dict[str, int]:
     return dict(collection)
 
 
-def owned_card_set(collection: dict[str, int]) -> set[str]:
+def owned_card_set(collection: dict[str, int] | Collection) -> set[str]:
     """
     Returns just the set of normalized card names owned, discarding quantity.
 
@@ -86,7 +87,7 @@ def owned_card_set(collection: dict[str, int]) -> set[str]:
     matcher can special-case those specific cards later without needing to
     re-parse the CSV.
     """
-    return set(collection.keys())
+    return set(collection if isinstance(collection, dict) else collection.names)
 
 
 if __name__ == "__main__":

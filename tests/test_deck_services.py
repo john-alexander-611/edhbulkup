@@ -2,6 +2,7 @@ import json
 
 import pytest
 
+from app.main import build_card_details, humanize_tag_label
 from commander_specific import (
     group_missing_cards_by_tag,
     rank_functional_replacements_for_tag,
@@ -95,6 +96,15 @@ def test_group_missing_cards_by_all_functional_tags():
     }
 
 
+def test_humanize_tag_label_formats_all_slug_variants():
+    assert humanize_tag_label("burn") == "Burn"
+    assert humanize_tag_label("death-trigger") == "Death Trigger"
+    assert humanize_tag_label("card-advantage") == "Card Advantage"
+    assert humanize_tag_label("lifegain") == "Life Gain"
+    assert humanize_tag_label("ramp") == "Ramp"
+    assert humanize_tag_label("recursion") == "Recursion"
+
+
 def test_rank_functional_replacements_filters_and_limits_by_synergy():
     deck = make_deck("Test", {"missing", "already in deck"}, "BR")
     tag_cache = FakeTagCache(
@@ -146,6 +156,19 @@ def test_rank_functional_replacements_filters_and_limits_by_synergy():
     )
 
     assert replacements == ["sol ring", "fellwar stone", "low synergy"]
+
+
+def test_build_card_details_keeps_every_missing_card():
+    details = build_card_details(
+        ["zeta", "alpha"],
+        lambda names: {
+            name: {"display_name": name.upper(), "image_url": f"https://example.com/{name}.jpg"}
+            for name in names
+        },
+    )
+
+    assert [card.name for card in details] == ["alpha", "zeta"]
+    assert [card.display_name for card in details] == ["ALPHA", "ZETA"]
 
 
 def test_load_decks_supports_empty_cache_and_reports_missing_cache(tmp_path):

@@ -5,10 +5,12 @@ from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from app.schemas import (
+    CardPresentationResponse,
     DeckAnalysisResponse,
     DeckMatchResponse,
     SearchQuery,
@@ -22,6 +24,9 @@ from find_deck_matches import (
     filter_excluded_commanders,
     filter_face_commanders,
     filter_partners,
+    filter_unlimited_commanders,
+    filter_commander_name,
+    get_commander_suggestions,
     get_decks,
 )
 from models.collection import Collection
@@ -30,8 +35,50 @@ from services.deck_service import add_recommendations, analyze_deck, search_deck
 from scryfall.cache_wrappers import ScryfallCache, TagCache
 
 app = FastAPI(title="EDH Bulk Up", version="0.1.0")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent / "templates"))
+
+
+def humanize_tag_label(tag: str) -> str:
+    if not tag:
+        return tag
+
+    label_map = {
+        "ramp": "Ramp",
+        "removal": "Removal",
+        "card-advantage": "Card Advantage",
+        "tutor": "Tutor",
+        "hate": "Hate",
+        "burn": "Burn",
+        "lifegain": "Life Gain",
+        "death-trigger": "Death Trigger",
+        "recursion": "Recursion",
+    }
+
+    normalized = tag.strip().lower()
+    return label_map.get(normalized, " ".join(part[:1].upper() + part[1:] for part in normalized.replace("_", "-").replace("-", " ").split()))
+
+
+def build_card_details(cards: list[str] | tuple[str, ...], lookup):
+    card_names = sorted(dict.fromkeys(card for card in cards if card and card.strip()))
+    if not card_names:
+        return []
+    card_meta_lookup = lookup(card_names)
+    return [
+        CardPresentationResponse(
+            name=card_name,
+            display_name=card_meta_lookup[card_name]["display_name"],
+            image_url=card_meta_lookup[card_name]["image_url"],
+        )
+        for card_name in card_names
+        if card_name in card_meta_lookup and card_meta_lookup[card_name] is not None
+    ]
 
 
 def get_uploaded_collection() -> Collection:
@@ -60,17 +107,21 @@ def search_commanders(
     identity: str | None = Query(default=None),
     contains: str | None = Query(default=None),
     exclude: str | None = Query(default=None),
+    name: str | None = Query(default=None),
     identity_colors: list[str] = Query(default=[]),
     contains_colors: list[str] = Query(default=[]),
     exclude_colors: list[str] = Query(default=[]),
     exclude_face: bool = Query(default=False),
     exclude_partners: bool = Query(default=False),
+    exclude_unlimited: bool = Query(default=False),
     exclude_commanders: str | None = Query(default=None),
     limit: int = Query(default=10, ge=1, le=50),
 ):
     collection = get_uploaded_collection()
     filters = []
 
+    if name:
+        filters.append(filter_commander_name(name))
     if color:
         filters.append(filter_color_identity(color))
     selected_identity = "".join(identity_colors)
@@ -86,6 +137,8 @@ def search_commanders(
         filters.append(filter_face_commanders)
     if exclude_partners:
         filters.append(filter_partners)
+    if exclude_unlimited:
+        filters.append(filter_unlimited_commanders)
 
     excluded_names = set(excluded_commanders)
     if exclude_commanders:
@@ -101,17 +154,30 @@ def search_commanders(
         filters=filters,
         limit=limit,
     )
-    return [
-        DeckMatchResponse(
-            commander_name=result.commander_name,
-            identity=result.identity,
-            match_score=result.match_score,
-            match_percentage=result.match_percentage,
-            owned_count=result.owned_count,
-            deck_size=result.deck_size,
-        )
-        for result in matches
-    ]
+    scryfall_cache = ScryfallCache()
+    try:
+        serialized_matches = []
+        for result in matches:
+            commander_meta = scryfall_cache.get_card_display(result.commander_name)
+            serialized_matches.append(
+                DeckMatchResponse(
+                    commander_name=result.commander_name,
+                    identity=result.identity,
+                    match_score=result.match_score,
+                    match_percentage=result.match_percentage,
+                    owned_count=result.owned_count,
+                    deck_size=result.deck_size,
+                    image_url=commander_meta["image_url"],
+                )
+            )
+        return serialized_matches
+    finally:
+        scryfall_cache.close()
+
+
+@app.get("/api/commanders/suggestions")
+def commander_suggestions(q: str = Query(default="")):
+    return {"suggestions": get_commander_suggestions(q, limit=15)}
 
 
 @app.get("/api/commanders/{commander_name}", response_model=DeckAnalysisResponse)
@@ -132,6 +198,35 @@ async def commander_analysis(commander_name: str):
     tag_cache = TagCache()
     try:
         analysis = add_recommendations(analysis, deck, collection, scryfall_cache, tag_cache)
+        missing_card_details = build_card_details(
+            analysis.missing_cards,
+            lambda names: scryfall_cache.get_many_card_displays(names),
+        )
+        replacements_by_tag = []
+        for group in analysis.replacements_by_tag:
+            group_missing_card_details = build_card_details(
+                group.missing_cards,
+                lambda names: {name: scryfall_cache.get_card_display(name) for name in names},
+            )
+            replacement_details = [
+                CardPresentationResponse(
+                    name=card_name,
+                    display_name=card_meta["display_name"],
+                    image_url=card_meta["image_url"],
+                )
+                for card_name in group.replacements
+                for card_meta in [scryfall_cache.get_card_display(card_name)]
+            ]
+            replacements_by_tag.append(
+                {
+                    "tag": humanize_tag_label(group.tag),
+                    "missing_cards": list(group.missing_cards),
+                    "missing_card_details": group_missing_card_details,
+                    "replacements": list(group.replacements),
+                    "replacement_details": replacement_details,
+                }
+            )
+        commander_meta = scryfall_cache.get_card_display(analysis.commander_name)
     finally:
         scryfall_cache.close()
         tag_cache.close()
@@ -144,20 +239,15 @@ async def commander_analysis(commander_name: str):
         owned_count=analysis.owned_count,
         missing_count=analysis.missing_count,
         missing_cards=list(analysis.missing_cards),
+        missing_card_details=missing_card_details,
         missing_by_tag={tag: list(cards) for tag, cards in analysis.missing_by_tag.items()},
-        replacements_by_tag=[
-            {
-                "tag": group.tag,
-                "missing_cards": list(group.missing_cards),
-                "replacements": list(group.replacements),
-            }
-            for group in analysis.replacements_by_tag
-        ],
+        replacements_by_tag=replacements_by_tag,
         owned_synergy_cards=list(analysis.owned_synergy_cards),
         same_type_replacements={
             card: list(names) for card, names in analysis.same_type_replacements.items()
         },
         warnings=list(analysis.warnings),
+        image_url=commander_meta["image_url"],
     )
 
 

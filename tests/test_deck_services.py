@@ -96,24 +96,49 @@ def test_group_missing_cards_by_all_functional_tags():
 
 
 def test_rank_functional_replacements_filters_and_limits_by_synergy():
-    deck = make_deck("Test", {"missing"}, "BR")
+    deck = make_deck("Test", {"missing", "already in deck"}, "BR")
     tag_cache = FakeTagCache(
         {},
-        {"ramp": {"sol ring", "fellwar stone", "off-color", "low synergy"}},
+        {
+            "ramp": {
+                "sol ring",
+                "fellwar stone",
+                "off-color",
+                "low synergy",
+                "already in deck",
+                "test",
+            }
+        },
     )
     scryfall_cache = FakeScryfallCache(
-        {"sol ring": "C", "fellwar stone": "C", "off-color": "W", "low synergy": "B"}
+        {
+            "sol ring": "C",
+            "fellwar stone": "C",
+            "off-color": "W",
+            "low synergy": "B",
+            "already in deck": "B",
+            "test": "B",
+        }
     )
     edhrec_suggestions = {
         "sol ring": 10,
         "fellwar stone": 8,
         "off-color": 100,
         "low synergy": 1,
+        "already in deck": 1000,
+        "test": 900,
     }
 
     replacements = rank_functional_replacements_for_tag(
         "ramp",
-        {"sol ring", "fellwar stone", "off-color", "low synergy"},
+        {
+            "sol ring",
+            "fellwar stone",
+            "off-color",
+            "low synergy",
+            "already in deck",
+            "test",
+        },
         deck,
         scryfall_cache,
         tag_cache,

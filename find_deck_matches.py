@@ -32,6 +32,10 @@ def filter_partners(deck: Deck):
     return "//" not in deck.name
 
 
+def filter_unlimited_commanders(deck: Deck):
+    return "unlimited" not in deck.name.lower()
+
+
 def filter_excluded_commanders(excluded):
     def _filter(deck: Deck):
         return deck.name not in excluded
@@ -50,6 +54,26 @@ def filter_exclude_colors(exclude_colors):
     def _filter(deck: Deck):
         return all(c not in deck.identity for c in exclude_colors)
     return _filter
+
+
+def filter_commander_name(name):
+    if not name or not name.strip():
+        return lambda deck: True
+    search_term = name.strip().lower()
+    return lambda deck: search_term in deck.name.lower()
+
+
+def get_commander_suggestions(query: str, limit: int = 10) -> list[str]:
+    if not query or not query.strip():
+        return []
+    search_term = query.strip().lower()
+    decks = get_decks()
+    matches = [
+        deck.name
+        for deck in sorted(decks.values(), key=lambda d: d.name)
+        if search_term in deck.name.lower()
+    ]
+    return matches[:limit]
 
 
 if __name__ == "__main__":

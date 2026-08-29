@@ -26,6 +26,24 @@ DB_PATH = "scryfall_cache.sqlite"
 BULK_DATA_INDEX_URL = "https://api.scryfall.com/bulk-data"
 
 
+def resolve_image_url(card: dict) -> str | None:
+    image_uris = (card.get("image_uris") or {})
+    if image_uris:
+        for key in ("normal", "large", "small", "png", "border_crop", "art_crop"):
+            url = image_uris.get(key)
+            if url:
+                return url
+
+    for face in card.get("card_faces") or []:
+        uris = face.get("image_uris") or {}
+        for key in ("normal", "large", "small", "png", "border_crop", "art_crop"):
+            url = uris.get(key)
+            if url:
+                return url
+
+    return None
+
+
 def init_db(conn: sqlite3.Connection):
     conn.executescript("""
         DROP TABLE IF EXISTS cards;
@@ -36,7 +54,9 @@ def init_db(conn: sqlite3.Connection):
             type_line TEXT,
             cmc REAL,
             mana_cost TEXT,
-            color_identity TEXT
+            color_identity TEXT,
+            display_name TEXT,
+            image_url TEXT
         );
         CREATE INDEX idx_cards_oracle_id ON cards(oracle_id);
     """)
@@ -71,6 +91,31 @@ async def get_oracle_cards_download_url(client: httpx.AsyncClient) -> str:
 
 def normalize(name: str) -> str:
     return name.strip().lower()
+
+
+def add_split_card_aliases(card: dict, batch: list[tuple]) -> None:
+    faces = card.get("card_faces") or []
+    if len(faces) < 2:
+        return
+
+    front_name = (faces[0] or {}).get("name")
+    if not front_name:
+        return
+
+    full_name = card.get("name")
+    if not full_name or normalize(front_name) == normalize(full_name):
+        return
+
+    batch.append((
+        normalize(front_name),
+        card.get("oracle_id"),
+        card.get("type_line"),
+        card.get("cmc"),
+        card.get("mana_cost"),
+        "".join(card.get("color_identity") or []) if (card.get("color_identity") or []) else "C",
+        full_name,
+        resolve_image_url(card),
+    ))
 
 
 async def build_cache():
@@ -112,12 +157,15 @@ async def build_cache():
                 card.get("cmc"),
                 card.get("mana_cost"),
                 color_identity,
+                card.get("name") or name,
+                resolve_image_url(card),
             ))
+            add_split_card_aliases(card, batch)
             count += 1
 
             if len(batch) >= BATCH_SIZE:
                 conn.executemany(
-                    "INSERT OR REPLACE INTO cards (name, oracle_id, type_line, cmc, mana_cost, color_identity) VALUES (?, ?, ?, ?, ?, ?)",
+                    "INSERT OR REPLACE INTO cards (name, oracle_id, type_line, cmc, mana_cost, color_identity, display_name, image_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                     batch,
                 )
                 conn.commit()
@@ -144,7 +192,7 @@ async def build_cache():
 
         if batch:
             conn.executemany(
-                "INSERT OR REPLACE INTO cards (name, oracle_id, type_line, cmc, mana_cost, color_identity) VALUES (?, ?, ?, ?, ?, ?)",
+                "INSERT OR REPLACE INTO cards (name, oracle_id, type_line, cmc, mana_cost, color_identity, display_name, image_url) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 batch,
             )
             conn.commit()

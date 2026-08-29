@@ -9,6 +9,12 @@ class SearchQuery(BaseModel):
     limit: int = Field(default=10, ge=1, le=50)
 
 
+class CardPresentationResponse(BaseModel):
+    name: str
+    display_name: str
+    image_url: str | None = None
+
+
 class DeckMatchResponse(BaseModel):
     commander_name: str
     identity: str
@@ -16,12 +22,15 @@ class DeckMatchResponse(BaseModel):
     match_percentage: float
     owned_count: int
     deck_size: int
+    image_url: str | None = None
 
 
 class ReplacementGroupResponse(BaseModel):
     tag: str
     missing_cards: list[str]
+    missing_card_details: list[CardPresentationResponse] = []
     replacements: list[str]
+    replacement_details: list[CardPresentationResponse] = []
 
 
 class DeckAnalysisResponse(BaseModel):
@@ -32,11 +41,13 @@ class DeckAnalysisResponse(BaseModel):
     owned_count: int
     missing_count: int
     missing_cards: list[str]
+    missing_card_details: list[CardPresentationResponse] = []
     missing_by_tag: dict[str, list[str]]
     replacements_by_tag: list[ReplacementGroupResponse] = []
     owned_synergy_cards: list[str] = []
     same_type_replacements: dict[str, list[str]] = {}
     warnings: list[str] = []
+    image_url: str | None = None
 
 
 class UploadCollectionResponse(BaseModel):

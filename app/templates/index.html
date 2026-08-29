@@ -132,6 +132,23 @@
       .small {
         font-size: 0.8rem;
       }
+      .filter-section {
+        width: 100%;
+        margin-top: 0.25rem;
+      }
+      .checkboxes {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem 0.75rem;
+        margin-top: 0.4rem;
+      }
+      .checkboxes label {
+        display: inline-flex;
+        flex-direction: row;
+        align-items: center;
+        gap: 0.25rem;
+        color: var(--text);
+      }
       @media (max-width: 900px) {
         .layout { grid-template-columns: 1fr; }
       }
@@ -148,25 +165,53 @@
             <input type="file" name="file" accept=".csv" />
             <button type="submit">Upload CSV</button>
           </form>
-          <pre id="upload-result" class="small">No collection uploaded yet.</pre>
+          <pre id="upload-result" class="small">Upload a CSV to begin searching.</pre>
 
           <h2 style="margin-top: 1.5rem;">Find commanders</h2>
           <form id="search-form">
+            <fieldset class="filter-section">
+              <legend>Exact identity</legend>
+              <div class="checkboxes">
+                <label><input type="checkbox" name="identity_colors" value="W" /> W</label>
+                <label><input type="checkbox" name="identity_colors" value="U" /> U</label>
+                <label><input type="checkbox" name="identity_colors" value="B" /> B</label>
+                <label><input type="checkbox" name="identity_colors" value="R" /> R</label>
+                <label><input type="checkbox" name="identity_colors" value="G" /> G</label>
+                <label><input type="checkbox" name="identity_colors" value="C" /> C</label>
+              </div>
+            </fieldset>
+            <fieldset class="filter-section">
+              <legend>Contains all colors</legend>
+              <div class="checkboxes">
+                <label><input type="checkbox" name="contains_colors" value="W" /> W</label>
+                <label><input type="checkbox" name="contains_colors" value="U" /> U</label>
+                <label><input type="checkbox" name="contains_colors" value="B" /> B</label>
+                <label><input type="checkbox" name="contains_colors" value="R" /> R</label>
+                <label><input type="checkbox" name="contains_colors" value="G" /> G</label>
+                <label><input type="checkbox" name="contains_colors" value="C" /> C</label>
+              </div>
+            </fieldset>
+            <fieldset class="filter-section">
+              <legend>Exclude colors</legend>
+              <div class="checkboxes">
+                <label><input type="checkbox" name="exclude_colors" value="W" /> W</label>
+                <label><input type="checkbox" name="exclude_colors" value="U" /> U</label>
+                <label><input type="checkbox" name="exclude_colors" value="B" /> B</label>
+                <label><input type="checkbox" name="exclude_colors" value="R" /> R</label>
+                <label><input type="checkbox" name="exclude_colors" value="G" /> G</label>
+                <label><input type="checkbox" name="exclude_colors" value="C" /> C</label>
+              </div>
+            </fieldset>
             <label>
-              Color
-              <select name="color">
-                <option value="">Any</option>
-                <option value="W">W</option>
-                <option value="U">U</option>
-                <option value="B">B</option>
-                <option value="R">R</option>
-                <option value="G">G</option>
-                <option value="C">C</option>
-              </select>
+              Excluded commanders
+              <input type="text" name="exclude_commanders" placeholder="Name 1, Name 2" />
             </label>
-            <label>
-              Exclude
-              <input type="text" name="exclude" placeholder="UB" />
+            <label style="min-width: 160px;">
+              <span>Advanced filters</span>
+              <span style="display:flex; gap:0.5rem; align-items:center; margin-top:0.25rem;">
+                <label><input type="checkbox" name="exclude_face" checked /> Exclude face</label>
+                <label><input type="checkbox" name="exclude_partners" checked /> Exclude partners</label>
+              </span>
             </label>
             <label>
               Limit
@@ -240,6 +285,9 @@
         const response = await fetch('/api/collection/upload', { method: 'POST', body: formData });
         const data = await response.json();
         uploadResult.textContent = JSON.stringify(data, null, 2);
+        if (response.ok) {
+          searchForm.requestSubmit();
+        }
       });
 
       searchForm.addEventListener('submit', async (event) => {
@@ -250,6 +298,10 @@
         const data = await response.json();
 
         searchResults.innerHTML = '';
+        if (!response.ok) {
+          searchResults.innerHTML = `<li class="muted">${data.detail || 'Upload a collection CSV first.'}</li>`;
+          return;
+        }
         data.forEach((item) => {
           const li = document.createElement('li');
           li.className = 'result';
@@ -269,7 +321,6 @@
         });
       });
 
-      searchForm.requestSubmit();
     </script>
   </body>
 </html>

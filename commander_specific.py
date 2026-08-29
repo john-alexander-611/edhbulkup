@@ -100,9 +100,11 @@ def rank_functional_replacements_for_tag(
 ) -> list[str]:
     """Return the top five legal, owned EDHREC suggestions for one tag."""
     candidates = tag_cache.get_cards_with_tag(tag)
+    excluded_cards = set(deck.cards) | {deck.name.strip().lower()}
     legal_owned = [
         card
         for card in candidates & owned_cards & edhrec_suggestions.keys()
+        if card not in excluded_cards
         if deck.is_card_legal(scryfall_cache.get_color_identity(card) or "")
     ]
     legal_owned.sort(

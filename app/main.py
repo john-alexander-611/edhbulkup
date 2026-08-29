@@ -15,8 +15,13 @@ from app.schemas import (
     UploadCollectionResponse,
 )
 from find_deck_matches import (
+    excluded_commanders,
     filter_color_identity,
+    filter_contains_colors,
     filter_exclude_colors,
+    filter_excluded_commanders,
+    filter_face_commanders,
+    filter_partners,
     get_decks,
 )
 from models.collection import Collection
@@ -27,6 +32,16 @@ from scryfall.cache_wrappers import ScryfallCache, TagCache
 app = FastAPI(title="EDH Bulk Up", version="0.1.0")
 
 templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent / "templates"))
+
+
+def get_uploaded_collection() -> Collection:
+    collection = getattr(app.state, "collection", None)
+    if collection is None:
+        raise HTTPException(
+            status_code=400,
+            detail="Upload a collection CSV before searching or analyzing commanders.",
+        )
+    return collection
 
 
 @app.get("/", response_class=HTMLResponse)
@@ -42,15 +57,43 @@ def health() -> dict[str, str]:
 @app.get("/api/search", response_model=list[DeckMatchResponse])
 def search_commanders(
     color: str | None = Query(default=None),
+    identity: str | None = Query(default=None),
+    contains: str | None = Query(default=None),
     exclude: str | None = Query(default=None),
+    identity_colors: list[str] = Query(default=[]),
+    contains_colors: list[str] = Query(default=[]),
+    exclude_colors: list[str] = Query(default=[]),
+    exclude_face: bool = Query(default=False),
+    exclude_partners: bool = Query(default=False),
+    exclude_commanders: str | None = Query(default=None),
     limit: int = Query(default=10, ge=1, le=50),
 ):
-    collection = Collection(parse_moxfield_csv("parse_input/collection.csv"))
+    collection = get_uploaded_collection()
     filters = []
+
     if color:
         filters.append(filter_color_identity(color))
-    if exclude:
-        filters.append(filter_exclude_colors(exclude))
+    selected_identity = "".join(identity_colors)
+    selected_contains = "".join(contains_colors)
+    selected_exclude = "".join(exclude_colors)
+    if identity or selected_identity:
+        filters.append(filter_color_identity(identity or selected_identity))
+    if contains or selected_contains:
+        filters.append(filter_contains_colors(contains or selected_contains))
+    if exclude or selected_exclude:
+        filters.append(filter_exclude_colors(exclude or selected_exclude))
+    if exclude_face:
+        filters.append(filter_face_commanders)
+    if exclude_partners:
+        filters.append(filter_partners)
+
+    excluded_names = set(excluded_commanders)
+    if exclude_commanders:
+        excluded_names.update(
+            name.strip() for name in exclude_commanders.split(",") if name.strip()
+        )
+    if excluded_names:
+        filters.append(filter_excluded_commanders(excluded_names))
 
     matches = search_decks(
         get_decks().values(),
@@ -83,7 +126,7 @@ async def commander_analysis(commander_name: str):
 
         deck.set_categories(await fetch_commander_page_categories(client, deck.name))
 
-    collection = Collection(parse_moxfield_csv("parse_input/collection.csv"))
+    collection = get_uploaded_collection()
     analysis = analyze_deck(deck, collection)
     scryfall_cache = ScryfallCache()
     tag_cache = TagCache()
@@ -123,6 +166,7 @@ def upload_collection(file: UploadFile = File(...)):
     content = file.file.read()
     parsed = parse_moxfield_csv(io.StringIO(content.decode("utf-8-sig")))
     collection = Collection(parsed)
+    app.state.collection = collection
     return UploadCollectionResponse(
         owned_count=len(collection.names),
         sample_cards=sorted(collection.names)[:10],

@@ -41,4 +41,3 @@ class DeckAnalysisResponse(BaseModel):
 
 class UploadCollectionResponse(BaseModel):
     owned_count: int
-    sample_cards: list[str]

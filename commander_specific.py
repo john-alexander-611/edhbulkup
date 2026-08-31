@@ -98,7 +98,7 @@ def rank_functional_replacements_for_tag(
     tag_cache: TagCache,
     edhrec_suggestions: dict[str, float],
 ) -> list[str]:
-    """Return the top five legal, owned EDHREC suggestions for one tag."""
+    """Return all legal, owned EDHREC suggestions for one tag, ranked by synergy."""
     candidates = tag_cache.get_cards_with_tag(tag)
     excluded_cards = set(deck.cards) | {deck.name.strip().lower()}
     legal_owned = [
@@ -110,7 +110,7 @@ def rank_functional_replacements_for_tag(
     legal_owned.sort(
         key=lambda card: (-edhrec_suggestions[card], card),
     )
-    return legal_owned[:5]
+    return legal_owned
 
 
 def suggest_functional_replacements(

@@ -15,6 +15,12 @@ class CardPresentationResponse(BaseModel):
     image_url: str | None = None
 
 
+class DecklistCardResponse(CardPresentationResponse):
+    quantity: int
+    owned: bool
+    card_type: str
+
+
 class DeckMatchResponse(BaseModel):
     commander_name: str
     identity: str
@@ -42,6 +48,7 @@ class DeckAnalysisResponse(BaseModel):
     missing_count: int
     missing_cards: list[str]
     missing_card_details: list[CardPresentationResponse] = []
+    average_decklist: list[DecklistCardResponse] = []
     missing_by_tag: dict[str, list[str]]
     replacements_by_tag: list[ReplacementGroupResponse] = []
     owned_synergy_cards: list[str] = []

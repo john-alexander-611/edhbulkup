@@ -31,4 +31,8 @@
 .suggestions { position: absolute; top: 100%; left: 0; right: 0; background: #0d1426; border: 1px solid #293451; border-top: 0; border-radius: 0 0 8px 8px; max-height: 300px; overflow-y: auto; z-index: 10; }
 .suggestionItem { padding: 10px; border-top: 1px solid #293451; color: #c5cee2; font-size: 13px; cursor: pointer; transition: background-color .15s; }
 .suggestionItem:hover { background-color: #1a2540; color: #e8edfa; }
+.chipRow { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 4px; }
+.chip { display: inline-flex; align-items: center; gap: 6px; background: #1a2540; border: 1px solid #293451; border-radius: 999px; padding: 5px 6px 5px 12px; color: #e8edfa; font-size: 12px; line-height: 1.4;}
+.chipRemove { display: grid; place-items: center; width: 18px; height: 18px; border: 0; border-radius: 50%; background: transparent; color: #9ca9c5; font-size: 14px; line-height: 1; cursor: pointer; transition: background-color .15s, color .15s;}
+.chipRemove:hover { background-color: #293451; color: #f87171; }
 @media (max-width: 760px) { .shell { padding: 32px 16px; }.workspace { grid-template-columns: 1fr; }.results { margin-left: 0; max-width: none; width: 100%; }.result { grid-template-columns: 110px minmax(0, 1fr); align-items: flex-start; }.result strong { grid-column: 2; } }

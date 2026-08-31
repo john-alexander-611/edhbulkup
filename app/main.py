@@ -12,6 +12,7 @@ from fastapi.templating import Jinja2Templates
 from app.schemas import (
     CardPresentationResponse,
     DeckAnalysisResponse,
+    DecklistCardResponse,
     DeckMatchResponse,
     SearchQuery,
     UploadCollectionResponse,
@@ -90,6 +91,10 @@ def get_uploaded_collection() -> Collection:
         )
     return collection
 
+def clear_uploaded_collection() -> None:
+    if hasattr(app.state, "collection"):
+        delattr(app.state, "collection")
+
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request) -> HTMLResponse:
@@ -114,7 +119,7 @@ def search_commanders(
     exclude_face: bool = Query(default=False),
     exclude_partners: bool = Query(default=False),
     exclude_unlimited: bool = Query(default=False),
-    exclude_commanders: str | None = Query(default=None),
+    exclude_commanders: list[str] = Query(default=[]),
     limit: int = Query(default=10, ge=1, le=50),
 ):
     collection = get_uploaded_collection()
@@ -140,11 +145,7 @@ def search_commanders(
     if exclude_unlimited:
         filters.append(filter_unlimited_commanders)
 
-    excluded_names = set(excluded_commanders)
-    if exclude_commanders:
-        excluded_names.update(
-            name.strip() for name in exclude_commanders.split(",") if name.strip()
-        )
+    excluded_names = {name.strip() for name in exclude_commanders if name.strip()}
     if excluded_names:
         filters.append(filter_excluded_commanders(excluded_names))
 
@@ -198,6 +199,20 @@ async def commander_analysis(commander_name: str):
     tag_cache = TagCache()
     try:
         analysis = add_recommendations(analysis, deck, collection, scryfall_cache, tag_cache)
+        average_decklist = [
+            DecklistCardResponse(
+                name=card_name,
+                display_name=card_meta["display_name"],
+                image_url=card_meta["image_url"],
+                quantity=quantity,
+                owned=card_name in collection.names,
+                card_type=scryfall_cache.get_primary_card_type(
+                    scryfall_cache.get_type_line(card_name) or ""
+                ) or "other",
+            )
+            for card_name, quantity in deck.average_decklist_counts
+            for card_meta in [scryfall_cache.get_card_display(card_name)]
+        ]
         missing_card_details = build_card_details(
             analysis.missing_cards,
             lambda names: scryfall_cache.get_many_card_displays(names),
@@ -240,6 +255,7 @@ async def commander_analysis(commander_name: str):
         missing_count=analysis.missing_count,
         missing_cards=list(analysis.missing_cards),
         missing_card_details=missing_card_details,
+        average_decklist=average_decklist,
         missing_by_tag={tag: list(cards) for tag, cards in analysis.missing_by_tag.items()},
         replacements_by_tag=replacements_by_tag,
         owned_synergy_cards=list(analysis.owned_synergy_cards),
@@ -261,6 +277,11 @@ def upload_collection(file: UploadFile = File(...)):
         owned_count=len(collection.names),
         sample_cards=sorted(collection.names)[:10],
     )
+    
+@app.post("/api/collection/clear")
+def clear_collection():
+    clear_uploaded_collection()
+    return {"status": "success"}
 
 
 if __name__ == "__main__":

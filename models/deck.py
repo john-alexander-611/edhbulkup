@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from collections import Counter
 
 from create_cache.edhrec_raw import CARD_CATEGORY_TAGS
 from models.commander import Commander
@@ -11,12 +12,18 @@ class Deck:
     commander: Commander
     cards: frozenset[str]
     categories: dict[str, list[dict]] | None = None
+    average_decklist: tuple[str, ...] = ()
 
     @classmethod
     def from_json(cls, name: str, data: dict) -> "Deck":
         commander = Commander(name=name, identity=data["identity"])
-        cards = frozenset(data["decklist"]) - BASIC_LANDS
-        return cls(commander=commander, cards=cards)
+        average_decklist = tuple(data["decklist"])
+        cards = frozenset(average_decklist) - BASIC_LANDS
+        return cls(
+            commander=commander,
+            cards=cards,
+            average_decklist=average_decklist,
+        )
 
     @property
     def name(self) -> str:
@@ -25,6 +32,10 @@ class Deck:
     @property
     def decklist(self) -> frozenset[str]:
         return self.cards
+
+    @property
+    def average_decklist_counts(self) -> tuple[tuple[str, int], ...]:
+        return tuple(sorted(Counter(self.average_decklist).items()))
 
     @property
     def identity(self) -> str:

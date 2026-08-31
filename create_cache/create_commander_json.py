@@ -18,18 +18,17 @@ def create_commander_json():
         if name not in commander_data:
             commander_data[name] = {
                 "identity": identity,
-                "decklist": set()
+                "decklist": []
             }
 
-        commander_data[name]["decklist"].add(card_name)
+        commander_data[name]["decklist"].append(card_name)
 
     conn.close()
 
-    # Convert sets to lists for JSON
     json_data = {
         commander: {
             "identity": data["identity"],
-            "decklist": list(data["decklist"])
+            "decklist": data["decklist"]
         }
         for commander, data in commander_data.items()
     }

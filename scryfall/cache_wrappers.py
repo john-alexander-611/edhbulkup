@@ -80,6 +80,11 @@ class ScryfallCache:
         row = self.conn.execute(
             "SELECT type_line FROM cards WHERE name = ?", (normalized,)
         ).fetchone()
+        if row is None:
+            row = self.conn.execute(
+                "SELECT type_line FROM cards WHERE name LIKE ? ORDER BY LENGTH(name) LIMIT 1",
+                (f"{normalized} // %",),
+            ).fetchone()
         return row[0] if row else None
 
     def _lookup_row(self, card_name: str):

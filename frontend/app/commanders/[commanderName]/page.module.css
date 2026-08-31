@@ -10,8 +10,26 @@
 .group p { color: #9ca9c5; }
 .subsection { margin-top: 18px; }
 .subsection h4 { margin: 0 0 12px; color: #dfe8ff; font-size: 14px; letter-spacing: .08em; text-transform: uppercase; }
-.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 16px; }
-.card { background: #151d32; border: 1px solid #293451; border-radius: 12px; overflow: hidden; }
-.card img, .fallback { display: block; width: 100%; aspect-ratio: 0.72; object-fit: cover; }
-.fallback { display: grid; place-items: center; color: #9ca9c5; background: #202a42; font-size: 13px; }
-.card strong { display: block; padding: 12px; font-size: 14px; line-height: 1.25; }
+.grid { display: flex; flex-wrap: wrap; gap: 4px 16px; }
+.cardLink { position: relative; display: inline-block; color: #dfe8ff; line-height: 1.5; text-decoration: none; }
+.cardLink:hover, .cardLink:focus-visible { color: #7dd3fc; text-decoration: underline; }
+.cardLink:hover .cardPreview, .cardLink:focus-visible .cardPreview { display: block; }
+.moreSuggestions { margin-top: 12px; border: 1px solid #53617f; border-radius: 6px; padding: 6px 10px; background: transparent; color: #7dd3fc; cursor: pointer; font: inherit; }
+.moreSuggestions:hover, .moreSuggestions:focus-visible { border-color: #7dd3fc; background: #202a42; }
+.missingCard { border-color: #dc2626; background: #3a171d; }
+.missingCard strong { color: #fecaca; }
+.decklist { columns: 2 320px; column-gap: 32px; }
+.decklistGroup { break-inside: avoid; margin: 0 0 24px; }
+.decklistGroup h3 { margin: 0 0 8px; font-size: 16px; }
+.decklistGroup ul { list-style: none; margin: 0; padding: 0; }
+.decklistCard { position: relative; display: flex; gap: 10px; align-items: baseline; padding: 4px 8px; color: #dfe8ff; }
+.decklistCard > strong { min-width: 20px; color: #9ca9c5; text-align: right; }
+.decklistCard.missingCard { background: transparent; border: 0; color: #fecaca; }
+.decklistCard.missingCard > strong { color: #f87171; }
+.decklistLink { position: relative; display: inline-block; color: inherit; text-decoration: none; }
+.decklistLink:hover { color: #7dd3fc; text-decoration: underline; }
+.decklistCard.missingCard .decklistLink { color: #fecaca; }
+.decklistCard.missingCard .decklistLink:hover { color: #fca5a5; }
+.cardPreview { display: none; position: absolute; z-index: 2; left: calc(100% + 8px); top: 50%; width: 260px; aspect-ratio: 0.72; object-fit: cover; border: 1px solid #53617f; border-radius: 6px; box-shadow: 0 12px 30px rgba(0,0,0,.45); transform: translateY(-50%); }
+.decklistLink:hover .cardPreview, .decklistLink:focus-visible .cardPreview { display: block; }
+@media (max-width: 720px) { .decklist { columns: 1; } .cardPreview { left: auto; right: 0; top: 100%; transform: none; } }

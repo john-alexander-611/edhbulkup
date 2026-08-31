@@ -41,7 +41,6 @@ TAG_CATEGORIES = [
     "ramp",
     "removal",
     "card-advantage",
-    "tutor",
     "hate",
     "burn",
     "lifegain",

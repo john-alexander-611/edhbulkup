@@ -3,6 +3,7 @@ import json
 import pytest
 
 from app.main import build_card_details, humanize_tag_label
+import services.deck_service as deck_service
 from commander_specific import (
     group_missing_cards_by_tag,
     rank_functional_replacements_for_tag,
@@ -26,11 +27,18 @@ class FakeTagCache:
 
 
 class FakeScryfallCache:
-    def __init__(self, identities):
+    def __init__(self, identities, type_lines=None):
         self.identities = identities
+        self.type_lines = type_lines or {}
 
     def get_color_identity(self, card_name):
         return self.identities.get(card_name)
+
+    def get_type_line(self, card_name):
+        return self.type_lines.get(card_name)
+
+    def get_primary_card_type(self, type_line):
+        return type_line.split(" ", 1)[0].lower() if type_line else None
 
 
 def make_deck(name, cards, identity="BR"):
@@ -156,6 +164,80 @@ def test_rank_functional_replacements_filters_and_limits_by_synergy():
     )
 
     assert replacements == ["sol ring", "fellwar stone", "low synergy"]
+
+
+def test_add_recommendations_adds_a_separate_land_group(monkeypatch):
+    deck = make_deck("Test", {"missing land", "missing creature"}, "BR")
+    deck.set_categories({})
+    tag_cache = FakeTagCache(
+        {
+            "missing land": ["ramp"],
+            "missing creature": ["ramp"],
+        },
+        {},
+    )
+    scryfall_cache = FakeScryfallCache(
+        {},
+        {
+            "missing land": "Land",
+            "missing creature": "Creature",
+        },
+    )
+    monkeypatch.setattr(
+        deck_service,
+        "suggest_functional_replacements",
+        lambda *args: {"ramp": ["mana rock"]},
+    )
+    monkeypatch.setattr(
+        deck_service,
+        "suggest_same_type_replacements_for_missing_cards",
+        lambda *args: {
+            "missing land": [
+                "land one",
+                "land two",
+                "land three",
+                "land four",
+                "land five",
+                "land six",
+                "land seven",
+                "land eight",
+                "land nine",
+                "land ten",
+                "land eleven",
+                "land twelve",
+            ]
+        },
+    )
+
+    result = deck_service.add_recommendations(
+        analyze_deck(deck, Collection()),
+        deck,
+        Collection(),
+        scryfall_cache,
+        tag_cache,
+    )
+
+    assert [(group.tag, group.missing_cards, group.replacements) for group in result.replacements_by_tag] == [
+        ("ramp", ("missing creature", "missing land"), ("mana rock",)),
+        (
+            "lands",
+            ("missing land",),
+            (
+                "land eight",
+                "land eleven",
+                "land five",
+                "land four",
+                "land nine",
+                "land one",
+                "land seven",
+                "land six",
+                "land ten",
+                "land three",
+                "land twelve",
+                "land two",
+            ),
+        ),
+    ]
 
 
 def test_build_card_details_keeps_every_missing_card():

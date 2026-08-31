@@ -84,6 +84,40 @@ def add_recommendations(
     replacements = suggest_functional_replacements(
         deck, owned_cards, scryfall_cache, tag_cache
     )
+    same_type_replacements = suggest_same_type_replacements_for_missing_cards(
+        deck, owned_cards
+    )
+    land_replacements = {
+        card: names
+        for card, names in same_type_replacements.items()
+        if scryfall_cache.get_primary_card_type(
+            scryfall_cache.get_type_line(card) or ""
+        ) == "land"
+    }
+    replacement_groups = [
+        ReplacementGroupResult(
+            tag=tag,
+            missing_cards=tuple(sorted(missing_by_tag[tag])),
+            replacements=tuple(replacements[tag]),
+        )
+        for tag in sorted(replacements)
+    ]
+    if land_replacements:
+        replacement_groups.append(
+            ReplacementGroupResult(
+                tag="lands",
+                missing_cards=tuple(sorted(land_replacements)),
+                replacements=tuple(
+                    sorted(
+                        {
+                            name
+                            for names in land_replacements.values()
+                            for name in names
+                        }
+                    )
+                ),
+            )
+        )
     return DeckAnalysisResult(
         commander_name=analysis.commander_name,
         identity=analysis.identity,
@@ -95,14 +129,7 @@ def add_recommendations(
             tag: tuple(sorted(cards))
             for tag, cards in sorted(missing_by_tag.items())
         },
-        replacements_by_tag=tuple(
-            ReplacementGroupResult(
-                tag=tag,
-                missing_cards=tuple(sorted(missing_by_tag[tag])),
-                replacements=tuple(replacements[tag]),
-            )
-            for tag in sorted(replacements)
-        ),
+        replacements_by_tag=tuple(replacement_groups),
         owned_synergy_cards=tuple(
             card["name"].strip().lower()
             for card in sorted(
@@ -116,9 +143,7 @@ def add_recommendations(
         same_type_replacements={
             card: tuple(sorted(names))
             for card, names in sorted(
-                suggest_same_type_replacements_for_missing_cards(
-                    deck, owned_cards
-                ).items()
+                same_type_replacements.items()
             )
         },
     )

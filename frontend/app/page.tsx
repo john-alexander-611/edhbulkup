@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { FormEvent, useEffect, useState, useRef } from "react";
-import { buildCommanderRoute, getCommanderSuggestions, searchCommanders, uploadCollection, type DeckMatch } from "@/lib/api";
+import { buildCommanderRoute, clearCollection, getCommanderSuggestions, searchCommanders, uploadCollection, type DeckMatch } from "@/lib/api";
 import styles from "./page.module.css";
 
 const colors = ["W", "U", "B", "R", "G", "C"];
@@ -15,7 +15,7 @@ type SessionState = {
   contains: string[];
   exclude: string[];
   commanderName: string;
-  excludedCommanders: string;
+  excludedCommanders: string[];
   excludeFace: boolean;
   excludePartners: boolean;
   excludeUnlimited: boolean;
@@ -44,14 +44,16 @@ function restoreFile(fileName: string | null, fileDataUrl: string | null): File 
 
 export default function HomePage() {
   const [file, setFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [identity, setIdentity] = useState<string[]>([]);
   const [contains, setContains] = useState<string[]>([]);
   const [exclude, setExclude] = useState<string[]>([]);
   const [commanderName, setCommanderName] = useState("");
-  const [excludedCommanders, setExcludedCommanders] = useState("");
+  const [excludedCommanders, setExcludedCommanders] = useState<string[]>([]);
+  const [excludeInput, setExcludeInput] = useState("");
   const [excludeFace, setExcludeFace] = useState(true);
   const [excludePartners, setExcludePartners] = useState(true);
-  const [excludeUnlimited, setExcludeUnlimited] = useState(false);
+  const [excludeUnlimited, setExcludeUnlimited] = useState(true);
   const [results, setResults] = useState<DeckMatch[]>([]);
   const [message, setMessage] = useState("Upload your collection CSV to begin.");
   const [loading, setLoading] = useState(false);
@@ -59,6 +61,9 @@ export default function HomePage() {
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const suggestionTimeout = useRef<NodeJS.Timeout | null>(null);
+  const [excludedSuggestions, setExcludedSuggestions] = useState<string[]>([]);
+  const [showExcludedSuggestions, setShowExcludedSuggestions] = useState(false);
+  const excludedSuggestionTimeout = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -75,7 +80,9 @@ export default function HomePage() {
       setContains(session.contains ?? []);
       setExclude(session.exclude ?? []);
       setCommanderName(session.commanderName ?? "");
-      setExcludedCommanders(session.excludedCommanders ?? "");
+      setExcludedCommanders(
+        Array.isArray(session.excludedCommanders) ? session.excludedCommanders : []
+      );
       setExcludeFace(session.excludeFace ?? true);
       setExcludePartners(session.excludePartners ?? true);
       setExcludeUnlimited(session.excludeUnlimited ?? false);
@@ -200,6 +207,38 @@ export default function HomePage() {
     setSuggestions([]);
   }
 
+  function handleExcludeInputChange(value: string) {
+    setExcludeInput(value);
+    setShowExcludedSuggestions(true);
+    if (excludedSuggestionTimeout.current) clearTimeout(excludedSuggestionTimeout.current);
+
+    excludedSuggestionTimeout.current = setTimeout(() => {
+      if (value.trim()) {
+        void getCommanderSuggestions(value)
+          .then((result) => {
+            const alreadySelected = new Set(excludedCommanders.map((n) => n.toLowerCase()));
+            setExcludedSuggestions(
+              result.suggestions.filter((n) => !alreadySelected.has(n.toLowerCase()))
+            );
+          })
+          .catch(() => setExcludedSuggestions([]));
+      } else {
+        setExcludedSuggestions([]);
+      }
+    }, 300);
+  }
+
+  function addExcludedCommander(name: string) {
+    setExcludedCommanders((current) => (current.includes(name) ? current : [...current, name]));
+    setExcludeInput("");
+    setShowExcludedSuggestions(false);
+    setExcludedSuggestions([]);
+  }
+
+  function removeExcludedCommander(name: string) {
+    setExcludedCommanders((current) => current.filter((n) => n !== name));
+  }
+
   async function handleUpload(event: FormEvent) {
     event.preventDefault();
     if (!file) return;
@@ -209,6 +248,22 @@ export default function HomePage() {
       setMessage(`${response.owned_count} unique cards loaded.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Upload failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleClearCollection() {
+    setLoading(true);
+    try {
+      await clearCollection();
+      setFile(null);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      setResults([]);
+      setMessage("Upload your collection CSV to begin.");
+      window.localStorage.removeItem(STORAGE_KEY);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to clear collection.");
     } finally {
       setLoading(false);
     }
@@ -246,15 +301,16 @@ export default function HomePage() {
     <main className={styles.shell}>
       <header className={styles.hero}>
         <p className={styles.eyebrow}>EDH BULK UP</p>
-        <h1>Find the next deck in your collection.</h1>
+        <h1>Find the next deck in your collection</h1>
         <p className={styles.subtitle}>Upload your cards, filter commanders, and see exactly what is missing.</p>
       </header>
       <section className={styles.workspace}>
         <aside className={styles.controls}>
           <form onSubmit={handleUpload} className={styles.card}>
             <h2>Collection</h2>
-            <input type="file" accept=".csv" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
+            <input ref={fileInputRef} type="file" accept=".csv" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
             <button type="submit" disabled={!file || loading}>Upload CSV</button>
+            <button type="button" onClick={handleClearCollection} disabled={loading}>Clear Collection</button>
             <p className={styles.hint}>{message}</p>
           </form>
           <form onSubmit={handleSearch} className={styles.card}>
@@ -277,7 +333,41 @@ export default function HomePage() {
             <ColorGroup label="Contains all colors" values={contains} colorType="contains" onColorChange={handleColorToggle} />
             <ColorGroup label="Exclude colors" values={exclude} colorType="exclude" onColorChange={handleColorToggle} />
             <label className={styles.field}>Excluded commanders
-              <input value={excludedCommanders} onChange={(event) => setExcludedCommanders(event.target.value)} placeholder="Name 1, Name 2" />
+              <div className={styles.commanderInputWrapper}>
+                <input
+                  value={excludeInput}
+                  onChange={(event) => handleExcludeInputChange(event.target.value)}
+                  onFocus={() => excludeInput && setShowExcludedSuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowExcludedSuggestions(false), 200)}
+                   placeholder="e.g., Atraxa, Myrkul"
+                />
+                {showExcludedSuggestions && excludedSuggestions.length > 0 && (
+                  <div className={styles.suggestions}>
+                    {excludedSuggestions.map((name) => (
+                      <div key={name} className={styles.suggestionItem} onClick={() => addExcludedCommander(name)}>
+                        {name}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              {excludedCommanders.length > 0 && (
+                <div className={styles.chipRow}>
+                  {excludedCommanders.map((name) => (
+                    <span key={name} className={styles.chip}>
+                      {name}
+                      <button
+                        type="button"
+                        className={styles.chipRemove}
+                        onClick={() => removeExcludedCommander(name)}
+                        aria-label={`Remove ${name}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
             </label>
             <label className={styles.field}>Advanced filters
               <div className={styles.colors}>

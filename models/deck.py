@@ -1,10 +1,35 @@
 from dataclasses import dataclass
 from collections import Counter
+from typing import TYPE_CHECKING
 
 from create_cache.edhrec_raw import CARD_CATEGORY_TAGS
 from models.commander import Commander
 
+if TYPE_CHECKING:
+    from models.collection import Collection
+
 BASIC_LANDS = frozenset({"plains", "island", "swamp", "mountain", "forest"})
+
+# Cards with official rules text allowing more than one copy in a
+# singleton deck (some capped, e.g. Nazgul at 9 or Seven Dwarves at 7,
+# others truly unbounded). A single owned copy of these doesn't satisfy
+# the average decklist's need for many copies, so match_score weights
+# them by quantity instead of binary presence.
+MULTI_COPY_CARDS = frozenset({
+    "dragon's approach",
+    "hare apparent",
+    "nazgûl",
+    "persistent petitioners",
+    "rat colony",
+    "relentless rats",
+    "seven dwarves",
+    "shadowborn apostle",
+    "slime against humanity",
+    "templar knight",
+    "tempest hawk",
+    "war elephant",
+    "the ten thousand",
+})
 
 
 @dataclass
@@ -63,10 +88,39 @@ class Deck:
             for card in self.categories.get(tag, [])
         }
 
-    def match_score(self, owned_cards: set[str]) -> float:
-        if not self.cards:
+    def match_score(self, collection: "Collection | set[str]") -> float:
+        total = self.total_card_weight
+        if not total:
             return 0.0
-        return len(owned_cards & self.cards) / len(self.cards)
+        return self.owned_card_weight(collection) / total
+
+    def _card_weight(self, card: str) -> int:
+        """How many of the 99 average-deck slots this card occupies."""
+        if card in MULTI_COPY_CARDS:
+            return dict(self.average_decklist_counts).get(card, 1)
+        return 1
+
+    @property
+    def total_card_weight(self) -> int:
+        return sum(self._card_weight(card) for card in self.cards)
+
+    def owned_card_weight(self, collection: "Collection | set[str]") -> int:
+        # A plain set of names has no quantity data, so multi-copy cards fall
+        # back to binary present/absent matching.
+        quantity = getattr(collection, "quantity", None)
+        owned = 0
+        for card in self.cards:
+            weight = self._card_weight(card)
+            if quantity is None:
+                owned += weight if card in collection else 0
+            elif card in MULTI_COPY_CARDS:
+                owned += min(quantity(card), weight)
+            elif quantity(card) > 0:
+                owned += weight
+        return owned
+
+    def missing_card_weight(self, collection: "Collection | set[str]") -> int:
+        return self.total_card_weight - self.owned_card_weight(collection)
 
     def missing_cards(self, owned_cards: set[str]) -> set[str]:
         return self.cards - owned_cards

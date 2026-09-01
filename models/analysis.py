@@ -20,12 +20,12 @@ class DeckAnalysis:
 
     @property
     def owned_count(self) -> int:
-        return len(self.deck.cards) - len(self.missing_cards)
+        return self.deck.owned_card_weight(self.collection)
 
     @property
     def missing_count(self) -> int:
-        return len(self.missing_cards)
+        return self.deck.missing_card_weight(self.collection)
 
     @property
     def match_score(self) -> float:
-        return self.deck.match_score(self.collection.names)
+        return self.deck.match_score(self.collection)

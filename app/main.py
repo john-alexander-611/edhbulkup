@@ -4,10 +4,8 @@ import io
 from pathlib import Path
 
 import httpx
-from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
-from fastapi.templating import Jinja2Templates
 
 from app.schemas import (
     CardPresentationResponse,
@@ -15,6 +13,7 @@ from app.schemas import (
     DecklistCardResponse,
     DeckMatchResponse,
     SearchQuery,
+    SearchResultsResponse,
     UploadCollectionResponse,
 )
 from find_deck_matches import (
@@ -25,14 +24,13 @@ from find_deck_matches import (
     filter_excluded_commanders,
     filter_face_commanders,
     filter_partners,
-    filter_unlimited_commanders,
     filter_commander_name,
     get_commander_suggestions,
     get_decks,
 )
 from models.collection import Collection
-from parse_input.parse_moxfield import parse_moxfield_csv
-from services.deck_service import add_recommendations, analyze_deck, search_decks
+from parse_input.parse_moxfield import parse_moxfield_csv, parse_plaintext_collection
+from services.deck_service import add_recommendations, analyze_deck, count_deck_matches, search_decks
 from scryfall.cache_wrappers import ScryfallCache, TagCache
 
 app = FastAPI(title="EDH Bulk Up", version="0.1.0")
@@ -42,8 +40,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-templates = Jinja2Templates(directory=str(Path(__file__).resolve().parent / "templates"))
 
 
 def humanize_tag_label(tag: str) -> str:
@@ -96,17 +92,12 @@ def clear_uploaded_collection() -> None:
         delattr(app.state, "collection")
 
 
-@app.get("/", response_class=HTMLResponse)
-async def home(request: Request) -> HTMLResponse:
-    return templates.TemplateResponse(request, "index.html", {})
-
-
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
-@app.get("/api/search", response_model=list[DeckMatchResponse])
+@app.get("/api/search", response_model=SearchResultsResponse)
 def search_commanders(
     color: str | None = Query(default=None),
     identity: str | None = Query(default=None),
@@ -118,9 +109,10 @@ def search_commanders(
     exclude_colors: list[str] = Query(default=[]),
     exclude_face: bool = Query(default=False),
     exclude_partners: bool = Query(default=False),
-    exclude_unlimited: bool = Query(default=False),
+    only_owned_commanders: bool = Query(default=False),
     exclude_commanders: list[str] = Query(default=[]),
-    limit: int = Query(default=10, ge=1, le=50),
+    limit: int = Query(default=20, ge=1, le=50),
+    offset: int = Query(default=0, ge=0),
 ):
     collection = get_uploaded_collection()
     filters = []
@@ -142,19 +134,22 @@ def search_commanders(
         filters.append(filter_face_commanders)
     if exclude_partners:
         filters.append(filter_partners)
-    if exclude_unlimited:
-        filters.append(filter_unlimited_commanders)
+    if only_owned_commanders:
+        filters.append(lambda deck: deck.commander.name in collection)
 
     excluded_names = {name.strip() for name in exclude_commanders if name.strip()}
     if excluded_names:
         filters.append(filter_excluded_commanders(excluded_names))
 
+    all_decks = get_decks().values()
     matches = search_decks(
-        get_decks().values(),
+        all_decks,
         collection,
         filters=filters,
         limit=limit,
+        offset=offset,
     )
+    total = count_deck_matches(all_decks, filters=filters)
     scryfall_cache = ScryfallCache()
     try:
         serialized_matches = []
@@ -171,7 +166,7 @@ def search_commanders(
                     image_url=commander_meta["image_url"],
                 )
             )
-        return serialized_matches
+        return SearchResultsResponse(results=serialized_matches, total=total)
     finally:
         scryfall_cache.close()
 
@@ -205,7 +200,8 @@ async def commander_analysis(commander_name: str):
                 display_name=card_meta["display_name"],
                 image_url=card_meta["image_url"],
                 quantity=quantity,
-                owned=card_name in collection.names,
+                owned_quantity=min(collection.quantity(card_name), quantity),
+                owned=collection.quantity(card_name) >= quantity,
                 card_type=scryfall_cache.get_primary_card_type(
                     scryfall_cache.get_type_line(card_name) or ""
                 ) or "other",
@@ -270,7 +266,11 @@ async def commander_analysis(commander_name: str):
 @app.post("/api/collection/upload", response_model=UploadCollectionResponse)
 def upload_collection(file: UploadFile = File(...)):
     content = file.file.read()
-    parsed = parse_moxfield_csv(io.StringIO(content.decode("utf-8-sig")))
+    decoded_content = content.decode("utf-8-sig")
+    if Path(file.filename or "").suffix.lower() == ".txt":
+        parsed = parse_plaintext_collection(io.StringIO(decoded_content))
+    else:
+        parsed = parse_moxfield_csv(io.StringIO(decoded_content))
     collection = Collection(parsed)
     app.state.collection = collection
     return UploadCollectionResponse(

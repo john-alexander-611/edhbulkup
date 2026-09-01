@@ -1,9 +1,14 @@
 import sqlite3
 import json
+from pathlib import Path
+
+# Resolved relative to this file, not the caller's cwd, so the output always
+# lands in create_cache/ regardless of where the script is invoked from.
+_DIR = Path(__file__).parent
 
 
 def create_commander_json():
-    conn = sqlite3.connect("../cache.sqlite")
+    conn = sqlite3.connect(str(_DIR.parent / "cache.sqlite"))
 
     commander_data = {}
 
@@ -33,7 +38,7 @@ def create_commander_json():
         for commander, data in commander_data.items()
     }
 
-    with open("commander_data.json", "w") as f:
+    with open(_DIR / "commander_data.json", "w") as f:
         json.dump(json_data, f, indent=2)
         print("\ncommander_data.json write completed")
 

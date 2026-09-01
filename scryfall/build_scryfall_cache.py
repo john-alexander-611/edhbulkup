@@ -93,6 +93,17 @@ def normalize(name: str) -> str:
     return name.strip().lower()
 
 
+# Scryfall's oracle_cards bulk file includes non-gameplay objects (art-only
+# cards, tokens, emblems, etc.) that share a name with a real card but have
+# no real type_line (e.g. art series cards have type_line "Card"). Loading
+# these can overwrite the real card's cache row if they sort later in the
+# file, so they're skipped entirely.
+SKIP_LAYOUTS = {
+    "art_series", "token", "double_faced_token", "emblem", "vanguard",
+    "scheme", "planar", "phenomenon",
+}
+
+
 def add_split_card_aliases(card: dict, batch: list[tuple]) -> None:
     faces = card.get("card_faces") or []
     if len(faces) < 2:
@@ -140,6 +151,8 @@ async def build_cache():
             card = json.loads(line)
             name = card.get("name")
             if not name:
+                return
+            if card.get("layout") in SKIP_LAYOUTS:
                 return
 
             # Stored the same way Commander.identity already is - a plain

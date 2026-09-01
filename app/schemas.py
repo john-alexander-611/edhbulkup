@@ -17,6 +17,7 @@ class CardPresentationResponse(BaseModel):
 
 class DecklistCardResponse(CardPresentationResponse):
     quantity: int
+    owned_quantity: int
     owned: bool
     card_type: str
 
@@ -29,6 +30,11 @@ class DeckMatchResponse(BaseModel):
     owned_count: int
     deck_size: int
     image_url: str | None = None
+
+
+class SearchResultsResponse(BaseModel):
+    results: list[DeckMatchResponse]
+    total: int
 
 
 class ReplacementGroupResponse(BaseModel):

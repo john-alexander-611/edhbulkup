@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import os
 from pathlib import Path
 
 import httpx
@@ -33,12 +34,32 @@ from parse_input.parse_moxfield import parse_moxfield_csv, parse_plaintext_colle
 from services.deck_service import add_recommendations, analyze_deck, count_deck_matches, search_decks
 from scryfall.cache_wrappers import ScryfallCache, TagCache
 
+def get_allowed_origins() -> list[str]:
+    configured = os.getenv("CORS_ALLOWED_ORIGINS", "")
+    origins = [
+        origin.strip().rstrip("/")
+        for origin in configured.split(",")
+        if origin.strip()
+    ]
+    if origins:
+        return origins
+    return [
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://0.0.0.0:3000",
+        "https://localhost:3000",
+        "https://127.0.0.1:3000",
+    ]
+
+
 app = FastAPI(title="EDH Bulk Up", version="0.1.0")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=get_allowed_origins(),
+    allow_origin_regex=r"https://.*\.vercel\.app|https://.*\.vercel\.app/.*",
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["*"],
 )
 
 
@@ -287,4 +308,7 @@ def clear_collection():
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("app.main:app", host="127.0.0.1", port=8000, reload=True)
+    host = os.getenv("HOST", "0.0.0.0")
+    port = int(os.getenv("PORT", "8000"))
+    reload = os.getenv("APP_ENV", "production") != "production"
+    uvicorn.run("app.main:app", host=host, port=port, reload=reload)

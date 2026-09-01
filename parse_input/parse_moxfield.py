@@ -1,19 +1,20 @@
-"""
-Parses a Moxfield collection CSV export into a normalized card-name -> quantity
-mapping, ready to compare against the decklist_cards cache.
+"""Parse supported collection exports into normalized card quantities.
 
-Moxfield's export format (relevant columns):
-    Count, Tradelist Count, Name, Edition, Condition, Language, Foil, Tags,
-    Last Modified, Collector Number, Alter, Proxy, Purchase Price
-
-Only Count and Name matter for deck matching. Everything else (edition,
-condition, foil, etc.) is ignored - the same card in two different sets
-or foil/non-foil both just count as "you own this card".
+Only a card-name field (``Name`` or ``Card Name``) and a quantity field
+(``Count`` or ``Quantity``) are required. Other export-specific columns are
+ignored, so Moxfield and Archidekt exports can be read without conversion.
 """
-#TODO: create a collection class with different input methods
 import csv
+import re
 from collections import defaultdict
 from models.collection import Collection
+
+
+NAME_HEADERS = ("Name", "Card Name")
+QUANTITY_HEADERS = ("Count", "Quantity")
+TEXT_COLLECTION_LINE = re.compile(
+    r"^\s*(?P<quantity>\d+)\s+(?P<name>.+)\s+\([^)]+\)\s+\S+(?:\s+\*F\*)?\s*$"
+)
 
 
 def normalize(name: str) -> str:
@@ -39,9 +40,9 @@ def parse_moxfield_csv(path_or_fileobj) -> dict[str, int]:
     """
     Returns {normalized_card_name: total_quantity_owned}.
 
-    Accepts a file path (str) or an already-open file-like object, so it
-    works the same way whether you're reading from disk or from an
-    in-memory upload (e.g. a Streamlit file uploader).
+    Accepts a file path (str) or an already-open file-like object. Supported
+    exports must include a name column (``Name`` or ``Card Name``) and a
+    quantity column (``Count`` or ``Quantity``).
     """
     collection: dict[str, int] = defaultdict(int)
 
@@ -54,9 +55,16 @@ def parse_moxfield_csv(path_or_fileobj) -> dict[str, int]:
 
     try:
         reader = csv.DictReader(f)
+        name_header = next((header for header in NAME_HEADERS if header in reader.fieldnames), None)
+        quantity_header = next(
+            (header for header in QUANTITY_HEADERS if header in reader.fieldnames), None
+        )
+        if not name_header or not quantity_header:
+            return {}
+
         for row in reader:
-            raw_name = row.get("Name")
-            raw_count = row.get("Count")
+            raw_name = row.get(name_header)
+            raw_count = row.get(quantity_header)
             if not raw_name or not raw_count:
                 continue
 
@@ -70,6 +78,21 @@ def parse_moxfield_csv(path_or_fileobj) -> dict[str, int]:
     finally:
         if should_close:
             f.close()
+
+    return dict(collection)
+
+
+def parse_plaintext_collection(fileobj) -> dict[str, int]:
+    """Parse ``quantity card name (set) collector-number`` collection lines."""
+    collection: dict[str, int] = defaultdict(int)
+
+    for line in fileobj:
+        match = TEXT_COLLECTION_LINE.match(line)
+        if not match:
+            continue
+
+        for key in split_dfc_names(match["name"]):
+            collection[key] += int(match["quantity"])
 
     return dict(collection)
 

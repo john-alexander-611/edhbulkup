@@ -1,8 +1,9 @@
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8001";
 
 export type CardPresentation = { name: string; display_name: string; image_url: string | null };
-export type DecklistCard = CardPresentation & { quantity: number; owned: boolean; card_type: string };
+export type DecklistCard = CardPresentation & { quantity: number; owned_quantity: number; owned: boolean; card_type: string };
 export type DeckMatch = { commander_name: string; identity: string; match_score: number; match_percentage: number; owned_count: number; deck_size: number; image_url: string | null };
+export type SearchResults = { results: DeckMatch[]; total: number };
 export type ReplacementGroup = {
   tag: string;
   missing_cards: string[];
@@ -15,7 +16,7 @@ export type DeckAnalysis = {
   owned_count: number; missing_count: number; missing_cards: string[];
   missing_card_details: CardPresentation[]; average_decklist: DecklistCard[]; missing_by_tag: Record<string, string[]>;
   replacements_by_tag: ReplacementGroup[]; owned_synergy_cards: string[];
-  same_type_replacements: Record<string, string[]>; warnings: string[];
+  same_type_replacements: Record<string, string[]>; warnings: string[]; image_url: string | null;
 };
 export type SearchFilters = {
   name?: string;
@@ -25,8 +26,9 @@ export type SearchFilters = {
   exclude_commanders?: string[];
   exclude_face?: boolean;
   exclude_partners?: boolean;
-  exclude_unlimited?: boolean;
+  only_owned_commanders?: boolean;
   limit?: number;
+  offset?: number;
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
@@ -59,7 +61,7 @@ export function searchCommanders(filters: SearchFilters) {
     if (name.trim()) params.append("exclude_commanders", name);
   });
 
-  return request<DeckMatch[]>(`/api/search?${params.toString()}`);
+  return request<SearchResults>(`/api/search?${params.toString()}`);
 }
 
 export function getCommanderAnalysis(name: string) {

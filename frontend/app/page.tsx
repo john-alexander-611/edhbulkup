@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { FormEvent, useEffect, useState, useRef } from "react";
 import { buildCommanderRoute, clearCollection, getCommanderSuggestions, searchCommanders, uploadCollection, type DeckMatch } from "@/lib/api";
@@ -7,6 +8,7 @@ import styles from "./page.module.css";
 
 const colors = ["W", "U", "B", "R", "G", "C"];
 const STORAGE_KEY = "edh-bulk-up-state-v1";
+const PAGE_SIZE = 20;
 
 type SessionState = {
   fileName: string | null;
@@ -18,7 +20,7 @@ type SessionState = {
   excludedCommanders: string[];
   excludeFace: boolean;
   excludePartners: boolean;
-  excludeUnlimited: boolean;
+  onlyOwnedCommanders: boolean;
   results: DeckMatch[];
   message: string;
 };
@@ -32,7 +34,7 @@ function fileToDataUrl(file: File) {
   });
 }
 
-function restoreFile(fileName: string | null, fileDataUrl: string | null): File | null {
+function restoreFile(fileName: string | null, fileDataUrl: string | null): Promise<File | null> | null {
   if (!fileName || !fileDataUrl) return null;
   try {
     const response = fetch(fileDataUrl);
@@ -53,10 +55,12 @@ export default function HomePage() {
   const [excludeInput, setExcludeInput] = useState("");
   const [excludeFace, setExcludeFace] = useState(true);
   const [excludePartners, setExcludePartners] = useState(true);
-  const [excludeUnlimited, setExcludeUnlimited] = useState(true);
+  const [onlyOwnedCommanders, setOnlyOwnedCommanders] = useState(true);
   const [results, setResults] = useState<DeckMatch[]>([]);
   const [message, setMessage] = useState("Upload your collection CSV to begin.");
   const [loading, setLoading] = useState(false);
+  const [totalResults, setTotalResults] = useState(0);
+  const [page, setPage] = useState(1);
   const [hydrated, setHydrated] = useState(false);
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -85,8 +89,8 @@ export default function HomePage() {
       );
       setExcludeFace(session.excludeFace ?? true);
       setExcludePartners(session.excludePartners ?? true);
-      setExcludeUnlimited(session.excludeUnlimited ?? false);
-      setResults(session.results ?? []);
+      setOnlyOwnedCommanders(session.onlyOwnedCommanders ?? true);
+      setResults(Array.isArray(session.results) ? session.results : []);
       setMessage(session.message ?? "Upload your collection CSV to begin.");
 
       if (session.fileName && session.fileDataUrl) {
@@ -123,7 +127,7 @@ export default function HomePage() {
       excludedCommanders,
       excludeFace,
       excludePartners,
-      excludeUnlimited,
+      onlyOwnedCommanders,
       results,
       message,
     };
@@ -141,7 +145,7 @@ export default function HomePage() {
         window.localStorage.setItem(STORAGE_KEY, JSON.stringify({ ...payload, fileDataUrl: null }));
       }
     })();
-  }, [file, identity, contains, exclude, commanderName, excludedCommanders, excludeFace, excludePartners, excludeUnlimited, results, message, hydrated]);
+  }, [file, identity, contains, exclude, commanderName, excludedCommanders, excludeFace, excludePartners, onlyOwnedCommanders, results, message, hydrated]);
 
   const toggle = (values: string[], setValues: (next: string[]) => void, value: string) => {
     setValues(values.includes(value) ? values.filter((item) => item !== value) : [...values, value]);
@@ -246,6 +250,7 @@ export default function HomePage() {
     try {
       const response = await uploadCollection(file);
       setMessage(`${response.owned_count} unique cards loaded.`);
+      await fetchPage(1);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Upload failed.");
     } finally {
@@ -260,6 +265,11 @@ export default function HomePage() {
       setFile(null);
       if (fileInputRef.current) fileInputRef.current.value = "";
       setResults([]);
+      setTotalResults(0);
+      setPage(1);
+      setCommanderName("");
+      setSuggestions([]);
+      setShowSuggestions(false);
       setMessage("Upload your collection CSV to begin.");
       window.localStorage.removeItem(STORAGE_KEY);
     } catch (error) {
@@ -275,10 +285,14 @@ export default function HomePage() {
       setMessage("Upload your collection CSV before searching.");
       return;
     }
+    await fetchPage(1);
+  }
 
+  async function fetchPage(targetPage: number) {
+    if (!file) return;
     setLoading(true);
     try {
-      setResults(await searchCommanders({
+      const { results: matches, total } = await searchCommanders({
         name: commanderName,
         identity: identity.join(""),
         contains: contains.join(""),
@@ -286,9 +300,16 @@ export default function HomePage() {
         exclude_commanders: excludedCommanders,
         exclude_face: excludeFace,
         exclude_partners: excludePartners,
-        exclude_unlimited: excludeUnlimited,
-        limit: 20,
-      }));
+        only_owned_commanders: onlyOwnedCommanders,
+        limit: PAGE_SIZE,
+        offset: (targetPage - 1) * PAGE_SIZE,
+      });
+      if (!Array.isArray(matches) || typeof total !== "number") {
+        throw new Error("The search API returned an invalid response.");
+      }
+      setResults(matches);
+      setTotalResults(total);
+      setPage(targetPage);
       setMessage("");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Search failed.");
@@ -300,24 +321,36 @@ export default function HomePage() {
   return (
     <main className={styles.shell}>
       <header className={styles.hero}>
-        <p className={styles.eyebrow}>EDH BULK UP</p>
-        <h1>Find the next deck in your collection</h1>
-        <p className={styles.subtitle}>Upload your cards, filter commanders, and see exactly what is missing.</p>
+        <div className={styles.brand}>
+          <Image
+            className={styles.logo}
+            src="/edh_bulk_up_logo_v3.png"
+            alt="EDH Bulk Up"
+            width={360}
+            height={180}
+            priority
+          />
+          <p className={styles.brandText}>Find Decks Hidden in Your Bulk</p>
+        </div>
+        <p className={styles.collectionStatus}>{file ? "Collection loaded" : "No collection loaded"}</p>
       </header>
       <section className={styles.workspace}>
         <aside className={styles.controls}>
-          <form onSubmit={handleUpload} className={styles.card}>
+          <form onSubmit={handleUpload} className={`${styles.card} ${styles.collectionCard}`}>
             <h2>Collection</h2>
-            <input ref={fileInputRef} type="file" accept=".csv" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
-            <button type="submit" disabled={!file || loading}>Upload CSV</button>
-            <button type="button" onClick={handleClearCollection} disabled={loading}>Clear Collection</button>
+            <input ref={fileInputRef} type="file" accept=".csv,.txt,text/plain" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
+            {file && <p className={styles.fileName}>Current File: {file.name}</p>}
+            <button type="submit" disabled={!file || loading}>Upload Collection</button>
+            <button type="button" className={styles.clearCollection} onClick={handleClearCollection} disabled={loading}>Clear Collection</button>
             <p className={styles.hint}>{message}</p>
           </form>
-          <form onSubmit={handleSearch} className={styles.card}>
-            <h2>Find commanders</h2>
-            <label className={styles.field}>Search by name
+          <form onSubmit={handleSearch} className={`${styles.card} ${styles.filterCard}`}>
+            <div className={styles.filterHeading}>
+              <h2>Find commanders</h2>
+            </div>
+            <label className={`${styles.field} ${styles.searchField}`}>Search by name
               <div className={styles.commanderInputWrapper}>
-                <input value={commanderName} onChange={(event) => handleCommanderNameChange(event.target.value)} onFocus={() => commanderName && setShowSuggestions(true)} onBlur={() => setTimeout(() => setShowSuggestions(false), 200)} placeholder="e.g., Atraxa, Myrkul" />
+                <input value={commanderName} onChange={(event) => handleCommanderNameChange(event.target.value)} onFocus={() => commanderName && setShowSuggestions(true)} onBlur={() => setTimeout(() => setShowSuggestions(false), 200)} placeholder="Search commanders, e.g. Atraxa" />
                 {showSuggestions && suggestions.length > 0 && (
                   <div className={styles.suggestions}>
                     {suggestions.map((name) => (
@@ -329,58 +362,36 @@ export default function HomePage() {
                 )}
               </div>
             </label>
-            <ColorGroup label="Exact identity" values={identity} colorType="identity" onColorChange={handleColorToggle} />
-            <ColorGroup label="Contains all colors" values={contains} colorType="contains" onColorChange={handleColorToggle} />
-            <ColorGroup label="Exclude colors" values={exclude} colorType="exclude" onColorChange={handleColorToggle} />
-            <label className={styles.field}>Excluded commanders
-              <div className={styles.commanderInputWrapper}>
-                <input
-                  value={excludeInput}
-                  onChange={(event) => handleExcludeInputChange(event.target.value)}
-                  onFocus={() => excludeInput && setShowExcludedSuggestions(true)}
-                  onBlur={() => setTimeout(() => setShowExcludedSuggestions(false), 200)}
-                   placeholder="e.g., Atraxa, Myrkul"
-                />
-                {showExcludedSuggestions && excludedSuggestions.length > 0 && (
-                  <div className={styles.suggestions}>
-                    {excludedSuggestions.map((name) => (
-                      <div key={name} className={styles.suggestionItem} onClick={() => addExcludedCommander(name)}>
-                        {name}
+            <button className={styles.searchSubmit} type="submit" disabled={loading || !file}>Search commanders</button>
+            <div className={styles.filterOptions}>
+                <ColorGroup label="Exact Color Identity" values={identity} colorType="identity" onColorChange={handleColorToggle} />
+                <ColorGroup label="Contains Colors" values={contains} colorType="contains" onColorChange={handleColorToggle} />
+                <ColorGroup label="Exclude Colors" values={exclude} colorType="exclude" onColorChange={handleColorToggle} />
+                <label className={styles.field}>Excluded commanders
+                  <div className={styles.commanderInputWrapper}>
+                    <input value={excludeInput} onChange={(event) => handleExcludeInputChange(event.target.value)} onFocus={() => excludeInput && setShowExcludedSuggestions(true)} onBlur={() => setTimeout(() => setShowExcludedSuggestions(false), 200)} placeholder="Search commanders to exclude" />
+                    {showExcludedSuggestions && excludedSuggestions.length > 0 && (
+                      <div className={styles.suggestions}>
+                        {excludedSuggestions.map((name) => <div key={name} className={styles.suggestionItem} onClick={() => addExcludedCommander(name)}>{name}</div>)}
                       </div>
-                    ))}
+                    )}
                   </div>
-                )}
-              </div>
-              {excludedCommanders.length > 0 && (
-                <div className={styles.chipRow}>
-                  {excludedCommanders.map((name) => (
-                    <span key={name} className={styles.chip}>
-                      {name}
-                      <button
-                        type="button"
-                        className={styles.chipRemove}
-                        onClick={() => removeExcludedCommander(name)}
-                        aria-label={`Remove ${name}`}
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </label>
-            <label className={styles.field}>Advanced filters
-              <div className={styles.colors}>
-                <label><input type="checkbox" checked={excludeFace} onChange={() => setExcludeFace((value) => !value)} /> Exclude face</label>
-                <label><input type="checkbox" checked={excludePartners} onChange={() => setExcludePartners((value) => !value)} /> Exclude partners</label>
-                <label><input type="checkbox" checked={excludeUnlimited} onChange={() => setExcludeUnlimited((value) => !value)} /> Exclude unlimited</label>
-              </div>
-            </label>
-            <button type="submit" disabled={loading || !file}>Search commanders</button>
+                  {excludedCommanders.length > 0 && <div className={styles.chipRow}>
+                    {excludedCommanders.map((name) => <span key={name} className={styles.chip}>{name}<button type="button" className={styles.chipRemove} onClick={() => removeExcludedCommander(name)} aria-label={`Remove ${name}`}>×</button></span>)}
+                  </div>}
+                </label>
+                <label className={styles.field}>Advanced filters
+                  <div className={styles.colors}>
+                    <label><input type="checkbox" checked={excludeFace} onChange={() => setExcludeFace((value) => !value)} /> Exclude Face Commanders</label>
+                    <label><input type="checkbox" checked={excludePartners} onChange={() => setExcludePartners((value) => !value)} /> Exclude Partner Commanders</label>
+                    <label><input type="checkbox" checked={onlyOwnedCommanders} onChange={() => setOnlyOwnedCommanders((value) => !value)} /> Only Owned Commanders</label>
+                  </div>
+                </label>
+            </div>
           </form>
         </aside>
         <section className={styles.results}>
-          <div className={styles.resultsHeader}><h2>Commander matches</h2><span>{results.length} results</span></div>
+          <div className={styles.resultsHeader}><h2>Commander Matches</h2><span>{totalResults} results</span></div>
           {results.length === 0 ? <p className={styles.empty}>Your commander matches will appear here.</p> : results.map((result) => (
             <Link className={styles.result} href={buildCommanderRoute(result.commander_name)} key={result.commander_name}>
               <div className={styles.resultImageWrap}>
@@ -397,14 +408,58 @@ export default function HomePage() {
                 ) : (
                   <div className={styles.resultFallback}>Card</div>
                 )}
+                {result.image_url ? <img className={styles.resultPreview} src={result.image_url} alt="" /> : null}
               </div>
               <div className={styles.resultMeta}><h3>{result.commander_name}</h3><p>{result.owned_count} of {result.deck_size} cards owned</p></div>
               <strong>{result.match_percentage.toFixed(1)}%</strong>
             </Link>
           ))}
+          {totalResults > PAGE_SIZE && (
+            <Pagination
+              page={page}
+              totalPages={Math.ceil(totalResults / PAGE_SIZE)}
+              disabled={loading}
+              onPageChange={fetchPage}
+            />
+          )}
         </section>
       </section>
     </main>
+  );
+}
+
+function Pagination({ page, totalPages, disabled, onPageChange }: { page: number; totalPages: number; disabled: boolean; onPageChange: (page: number) => void }) {
+  const pageNumbers: (number | "ellipsis")[] = [];
+  for (let candidate = 1; candidate <= totalPages; candidate += 1) {
+    const isEdge = candidate === 1 || candidate === totalPages;
+    const isNearCurrent = Math.abs(candidate - page) <= 1;
+    if (isEdge || isNearCurrent) {
+      pageNumbers.push(candidate);
+    } else if (pageNumbers[pageNumbers.length - 1] !== "ellipsis") {
+      pageNumbers.push("ellipsis");
+    }
+  }
+
+  return (
+    <nav className={styles.pagination} aria-label="Result pages">
+      <button type="button" onClick={() => onPageChange(page - 1)} disabled={disabled || page <= 1}>Prev</button>
+      {pageNumbers.map((entry, index) =>
+        entry === "ellipsis" ? (
+          <span key={`ellipsis-${index}`} className={styles.paginationEllipsis}>…</span>
+        ) : (
+          <button
+            type="button"
+            key={entry}
+            className={entry === page ? styles.paginationActive : undefined}
+            onClick={() => onPageChange(entry)}
+            disabled={disabled || entry === page}
+          >
+            {entry}
+          </button>
+        )
+      )}
+      <button type="button" onClick={() => onPageChange(page + 1)} disabled={disabled || page >= totalPages}>Next</button>
+    </nav>
   );
 }
 
@@ -412,6 +467,6 @@ function ColorGroup({ label, values, colorType, onColorChange }: { label: string
   const isIdentity = label === 'Exact identity';
   const displayColors = isIdentity ? colors : colors.filter((c) => c !== 'C');
   return <fieldset className={styles.colors}><legend>{label}</legend>{displayColors.map((color) => (
-    <label key={color}><input type="checkbox" checked={values.includes(color)} onChange={() => onColorChange && colorType ? onColorChange(color, colorType) : undefined} />{color}</label>
+    <label key={color} aria-label={color}><input type="checkbox" checked={values.includes(color)} onChange={() => onColorChange && colorType ? onColorChange(color, colorType) : undefined} /><img className={styles.manaSymbol} src={`/mana/${color}.svg`} alt={color} /></label>
   ))}</fieldset>;
 }

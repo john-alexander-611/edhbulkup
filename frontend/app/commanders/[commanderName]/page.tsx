@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
@@ -66,9 +67,18 @@ export default function CommanderPage() {
   if (!analysis) return <main className={styles.page}><a href="/">Back to search</a><p>Loading commander analysis...</p></main>;
 
   return <main className={styles.page}>
-    <Link href="/">← Back to search</Link>
+    <header className={styles.appHeader}>
+      <Link className={styles.appBrand} href="/">
+        <Image className={styles.logo} src="/edh_bulk_up_logo_v3.png" alt="EDH Bulk Up" width={360} height={180} priority />
+        <span>Find Decks Hidden in Your Bulk</span>
+      </Link>
+      <Link className={styles.backLink} href="/">Back to search</Link>
+    </header>
     <header className={styles.header}>
-      {analysis.image_url ? <a href={scryfallCardUrl(analysis.commander_name)} target="_blank" rel="noreferrer"><img className={styles.commanderImage} src={analysis.image_url} alt={analysis.commander_name} /></a> : null}
+      {analysis.image_url ? <a className={styles.commanderImageLink} href={scryfallCardUrl(analysis.commander_name)} target="_blank" rel="noreferrer">
+        <img className={styles.commanderImage} src={analysis.image_url} alt={analysis.commander_name} />
+        <img className={styles.commanderImagePreview} src={analysis.image_url} alt="" />
+      </a> : null}
       <div className={styles.headerText}>
         <p className={styles.eyebrow}>{analysis.identity} COMMANDER</p>
         <h1>{analysis.commander_name}</h1>
@@ -76,7 +86,7 @@ export default function CommanderPage() {
       </div>
     </header>
     <section>
-      <h2>Average decklist</h2>
+      <h2>Average Decklist</h2>
       <div className={styles.decklist}>
         {decklistTypeOrder.map((type) => {
           const cards = groupDecklist(analysis.average_decklist ?? [], analysis.commander_name)[type];
@@ -89,15 +99,15 @@ export default function CommanderPage() {
         })}
       </div>
     </section>
-    <section><h2>Missing cards</h2><div className={styles.grid}>{analysis.missing_card_details.map((card) => <Card card={card} key={card.name} />)}</div></section>
-    <section><h2>Replacement recommendations</h2>{analysis.replacements_by_tag.map((group) => {
+    <section><h2>Missing cards</h2><ul className={styles.missingList}>{analysis.missing_card_details.map((card) => <li key={card.name}><strong>{analysis.average_decklist.find((deckCard) => deckCard.name === card.name)?.quantity ?? 1}</strong><Card card={card} /></li>)}</ul></section>
+    <section><h2>Replacement Recommendations by Category</h2>{analysis.replacements_by_tag.map((group) => {
       const isExpanded = expandedSuggestionGroups[group.tag];
       const visibleReplacements = isExpanded ? group.replacement_details : group.replacement_details.slice(0, 10);
       const hasMoreSuggestions = group.replacement_details.length > 10 && !isExpanded;
 
-      return <article className={styles.group} key={group.tag}><h3>{formatTagLabel(group.tag)}</h3>
-        <div className={styles.subsection}><h4>Missing Cards</h4>{group.missing_card_details?.length ? <div className={styles.grid}>{group.missing_card_details.map((card) => <Card card={card} key={`${group.tag}-${card.name}`} />)}</div> : <p>Missing: {group.missing_cards.join(", ") || "None"}</p>}</div>
-        <div className={styles.subsection}><h4>Suggested Replacements</h4><div className={styles.grid}>{visibleReplacements.map((card) => <Card card={card} key={card.name} />)}</div>{hasMoreSuggestions ? <button className={styles.moreSuggestions} type="button" onClick={() => setExpandedSuggestionGroups((groups) => ({ ...groups, [group.tag]: true }))}>More suggestions</button> : null}</div>
+      return <article className={styles.group} key={group.tag}><h3>Category: {formatTagLabel(group.tag)}</h3>
+        <div className={styles.subsection}><h4 className={styles.missingHeading}>Missing Cards</h4>{group.missing_card_details?.length ? <CardList cards={group.missing_card_details} /> : <p>Missing: {group.missing_cards.join(", ") || "None"}</p>}</div>
+        <div className={styles.subsection}><h4 className={styles.replacementHeading}>Suggested Replacements</h4><CardList cards={visibleReplacements} />{hasMoreSuggestions ? <button className={styles.moreSuggestions} type="button" onClick={() => setExpandedSuggestionGroups((groups) => ({ ...groups, [group.tag]: true }))}>More suggestions</button> : null}</div>
       </article>;
     })}</section>
   </main>;
@@ -110,9 +120,13 @@ function Card({ card }: { card: CardPresentation }) {
   </a>;
 }
 
+function CardList({ cards }: { cards: CardPresentation[] }) {
+  return <ul className={styles.cardList}>{cards.map((card) => <li key={card.name}><Card card={card} /></li>)}</ul>;
+}
+
 function DecklistCard({ card }: { card: DecklistCard }) {
   return <li className={`${styles.decklistCard} ${card.owned ? "" : styles.missingCard}`}>
-    <strong>{card.quantity}</strong>
+    <strong>{card.owned_quantity}/{card.quantity}</strong>
     <a className={styles.decklistLink} href={scryfallCardUrl(card.name)} target="_blank" rel="noreferrer">
       <span>{card.display_name || card.name}</span>
       {card.image_url ? <img className={styles.cardPreview} src={card.image_url} alt="" /> : null}

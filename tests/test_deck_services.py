@@ -1,4 +1,5 @@
 import json
+import io
 
 import pytest
 
@@ -11,6 +12,7 @@ from commander_specific import (
 from models.collection import Collection
 from models.commander import Commander
 from models.deck import Deck
+from parse_input.parse_moxfield import parse_moxfield_csv, parse_plaintext_collection
 from services.deck_service import analyze_deck, load_decks, search_decks
 
 
@@ -61,6 +63,43 @@ def test_search_decks_returns_match_percentage_and_deterministic_order():
     assert results[0].to_dict()["owned_count"] == 2
 
 
+def test_parse_collection_csv_supports_archidekt_headers_and_extra_columns():
+    export = io.StringIO(
+        "Quantity,Name,Finish,Condition\n"
+        "2,Sol Ring,Normal,NM\n"
+        "1,Sol Ring,Foil,NM\n"
+        "1,Delver of Secrets // Insectile Aberration,Normal,NM\n"
+    )
+
+    assert parse_moxfield_csv(export) == {
+        "sol ring": 3,
+        "delver of secrets // insectile aberration": 1,
+        "delver of secrets": 1,
+    }
+
+
+def test_parse_collection_csv_supports_card_name_header():
+    export = io.StringIO("Quantity,Card Name\n4,Rat Colony\n")
+
+    assert parse_moxfield_csv(export) == {"rat colony": 4}
+
+
+def test_parse_plaintext_collection_ignores_print_details_and_foil_markers():
+    export = io.StringIO(
+        "1 Aphelia, Viper Whisperer (J25) 40\n"
+        "10 Forest (MH3) 318\n"
+        "1 Revitalizing Repast / Old-Growth Grove (MH3) 256\n"
+        "1 Phyrexian Arena (ONE) 283 *F*\n"
+    )
+
+    assert parse_plaintext_collection(export) == {
+        "aphelia, viper whisperer": 1,
+        "forest": 10,
+        "revitalizing repast / old-growth grove": 1,
+        "phyrexian arena": 1,
+    }
+
+
 def test_search_decks_applies_filters_and_rejects_invalid_limit():
     decks = [
         make_deck("Boros", {"a"}, "R"),
@@ -76,6 +115,22 @@ def test_search_decks_applies_filters_and_rejects_invalid_limit():
     assert [result.commander_name for result in results] == ["Dimir"]
     with pytest.raises(ValueError, match="limit must be positive"):
         search_decks(decks, Collection(), limit=0)
+
+
+def test_search_decks_can_filter_to_owned_commanders():
+    decks = [
+        make_deck("Owned Commander", {"a"}),
+        make_deck("Unowned Commander", {"a"}),
+    ]
+    collection = Collection({"owned commander": 1, "a": 1})
+
+    results = search_decks(
+        decks,
+        collection,
+        filters=[lambda deck: deck.commander.name in collection],
+    )
+
+    assert [result.commander_name for result in results] == ["Owned Commander"]
 
 
 def test_analyze_deck_reports_sorted_missing_cards_and_counts():

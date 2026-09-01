@@ -38,23 +38,31 @@ def search_decks(
     collection: Collection,
     filters: Iterable[DeckFilter] = (),
     limit: int = 20,
+    offset: int = 0,
 ) -> list[DeckMatchResult]:
     if limit < 1:
         raise ValueError("Search result limit must be positive")
+    if offset < 0:
+        raise ValueError("Search result offset must not be negative")
     filters = tuple(filters)
     matches = [
         DeckMatchResult(
             commander_name=deck.name,
             identity=deck.identity,
-            match_score=deck.match_score(collection.names),
-            owned_count=len(deck.cards & collection.names),
-            deck_size=len(deck.cards),
+            match_score=deck.match_score(collection),
+            owned_count=deck.owned_card_weight(collection),
+            deck_size=deck.total_card_weight,
         )
         for deck in decks
         if all(deck_filter(deck) for deck_filter in filters)
     ]
     matches.sort(key=lambda match: (-match.match_score, match.commander_name))
-    return matches[:limit]
+    return matches[offset:offset + limit]
+
+
+def count_deck_matches(decks: Iterable[Deck], filters: Iterable[DeckFilter] = ()) -> int:
+    filters = tuple(filters)
+    return sum(1 for deck in decks if all(deck_filter(deck) for deck_filter in filters))
 
 
 def analyze_deck(deck: Deck, collection: Collection) -> DeckAnalysisResult:
@@ -62,9 +70,9 @@ def analyze_deck(deck: Deck, collection: Collection) -> DeckAnalysisResult:
     return DeckAnalysisResult(
         commander_name=deck.name,
         identity=deck.identity,
-        match_score=deck.match_score(collection.names),
-        owned_count=len(deck.cards & collection.names),
-        missing_count=len(missing_cards),
+        match_score=deck.match_score(collection),
+        owned_count=deck.owned_card_weight(collection),
+        missing_count=deck.missing_card_weight(collection),
         missing_cards=tuple(sorted(missing_cards)),
         missing_by_tag={},
     )

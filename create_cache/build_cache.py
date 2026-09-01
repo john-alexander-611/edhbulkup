@@ -12,13 +12,16 @@ Produces cache.sqlite with two tables:
 
 import asyncio
 import sqlite3
+from pathlib import Path
 
 import httpx
 
 from edhrec_raw import COLOR_IDENTITIES, fetch_average_deck, fetch_commanders_by_identity, normalize_identity
 from create_commander_json import create_commander_json
 
-DB_PATH = "../cache.sqlite"
+# Resolved relative to this file, not the caller's cwd, so the cache always
+# lands in the repo root regardless of where `python build_cache.py` is run from.
+DB_PATH = str(Path(__file__).parent.parent / "cache.sqlite")
 
 # Skip commanders with fewer decks than this - keeps the cache focused on
 # commanders popular enough to be worth matching against, and avoids

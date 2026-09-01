@@ -1,4 +1,27 @@
 * { box-sizing: border-box; }
-body { margin: 0; background: #0b1020; color: #f5f7ff; font-family: Arial, sans-serif; }
+
+:root {
+	--canvas: #101113;
+	--surface: #1a1c20;
+	--surface-raised: #23262b;
+	--surface-input: #121417;
+	--border: #353940;
+	--border-strong: #4a5058;
+	--text: #f1f3f5;
+	--text-muted: #a7adb7;
+	--accent: #5bb8ff;
+	--accent-strong: #218bd6;
+	--danger: #ed6a6a;
+}
+
+body {
+	margin: 0;
+	min-width: 320px;
+	background: var(--canvas);
+	color: var(--text);
+	font-family: "Segoe UI Variable", "Helvetica Neue", sans-serif;
+}
+
 button, input { font: inherit; }
 button { cursor: pointer; }
+button:focus-visible, input:focus-visible, a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }

@@ -1,37 +1,35 @@
 # edhbulkup
 # EDH Bulk Up
 
-## Run the legacy backend app
+The app has two parts that need to run at the same time:
 
-The original FastAPI app remains on port 8000 and should be left alone while working on the Next.js UI.
+- a FastAPI/uvicorn backend (Python)
+- a Next.js frontend (npm)
+
+## Run the backend (uvicorn)
+
+The frontend expects the API on **port 8001**, so start the backend with that port.
 
 From the repository root in PowerShell:
 
 ```powershell
-.\run_app.ps1 -Action start
+.\run_app.ps1 -Action start -Port 8001
 ```
 
-Use `restart` after code changes or `stop` to release port 8000:
+Use `restart` after code changes, or `stop` to release the port:
 
 ```powershell
-.\run_app.ps1 -Action restart
-.\run_app.ps1 -Action stop
+.\run_app.ps1 -Action restart -Port 8001
+.\run_app.ps1 -Action stop -Port 8001
 ```
 
-If GNU Make is installed, the equivalent commands are:
+If GNU Make is installed, `make start` / `make restart` / `make stop` run the same script on the default port (8000) — pass a port explicitly if you need 8001.
 
-```text
-make start
-make restart
-make stop
-make test
-```
+The backend is then available at http://127.0.0.1:8001.
 
-The legacy backend app is available at http://127.0.0.1:8000.
+## Run the frontend (Next.js)
 
-## Run the React/Next.js frontend
-
-Open a terminal in the frontend directory:
+In a separate terminal, from the repository root:
 
 ```powershell
 cd .\frontend
@@ -47,7 +45,13 @@ http://localhost:3000
 
 If port 3000 is already occupied, Next.js will automatically select the next available port, such as 3001.
 
-The frontend expects the analysis API to be running at http://127.0.0.1:8001, which is the dedicated port for the new UI.
+The frontend reads the API base URL from `frontend/.env.example` / `.env.local` (`NEXT_PUBLIC_API_BASE_URL`), which defaults to http://127.0.0.1:8001 — make sure this matches the port the backend is running on.
+
+## Tests
+
+```powershell
+make test
+```
 
 ## Frontend build check
 

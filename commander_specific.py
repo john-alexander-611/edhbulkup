@@ -71,6 +71,7 @@ def suggest_same_type_replacements_for_missing_cards(
         replacements = [
             card for card in same_type_cards
             if card["name"].strip().lower() in owned_cards
+            and card["name"].strip().lower() not in deck.cards
         ]
         replacements.sort(key=lambda c: c.get("synergy") or 0, reverse=True)
 

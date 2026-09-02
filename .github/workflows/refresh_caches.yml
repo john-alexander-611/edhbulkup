@@ -1,0 +1,52 @@
+name: Refresh Caches Nightly
+
+on:
+  schedule:
+    # Runs at 04:00 UTC every night
+    - cron: '0 4 * * *'
+  workflow_dispatch: 
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Build Scryfall Cache
+        run: python scryfall/build_scryfall_cache.py
+
+      - name: Build Tag Cache
+        run: python scryfall/build_tag_cache.py
+
+      - name: Build EDHREC Cache
+        run: python create_cache/build_cache.py
+
+      - name: Publish SQLite files to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # Delete existing tag/release if it exists so latest is always clean
+          gh release delete latest-caches --yes || true
+          git tag -d latest-caches || true
+          git push origin :refs/tags/latest-caches || true
+
+          # Create release and upload the 3 database files
+          gh release create latest-caches \
+            --title "Nightly MTG Caches" \
+            --notes "Automated daily cache build" \
+            scryfall_cache.sqlite \
+            tag_cache.sqlite \
+            cache.sqlite

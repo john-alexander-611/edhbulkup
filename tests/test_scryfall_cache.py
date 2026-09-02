@@ -19,8 +19,8 @@ def test_scryfall_cache_adds_display_name_and_image_url_for_legacy_schema(tmp_pa
 
     cache = ScryfallCache(str(db_path))
     cache.conn.execute(
-        "UPDATE cards SET display_name = ?, image_url = ? WHERE name = ?",
-        ("Lightning Bolt", "https://example.com/lightning-bolt.jpg", "lightning bolt"),
+        "UPDATE cards SET display_name = ?, image_url = ?, usd_price = ? WHERE name = ?",
+        ("Lightning Bolt", "https://example.com/lightning-bolt.jpg", 1.25, "lightning bolt"),
     )
     cache.conn.commit()
 
@@ -31,22 +31,26 @@ def test_scryfall_cache_adds_display_name_and_image_url_for_legacy_schema(tmp_pa
         "name": "lightning bolt",
         "display_name": "Lightning Bolt",
         "image_url": "https://example.com/lightning-bolt.jpg",
+        "usd_price": 1.25,
     }
     assert cache.get_card_display("darkbore pathway") == {
         "name": "darkbore pathway",
         "display_name": "Darkbore Pathway",
         "image_url": None,
+        "usd_price": None,
     }
     assert cache.get_many_card_displays(["Lightning Bolt", "darkbore pathway"]) == {
         "lightning bolt": {
             "name": "lightning bolt",
             "display_name": "Lightning Bolt",
             "image_url": "https://example.com/lightning-bolt.jpg",
+            "usd_price": 1.25,
         },
         "darkbore pathway": {
             "name": "darkbore pathway",
             "display_name": "Darkbore Pathway",
             "image_url": None,
+            "usd_price": None,
         },
     }
 
@@ -64,6 +68,7 @@ def test_scryfall_cache_adds_display_name_and_image_url_for_legacy_schema(tmp_pa
         "name": "darkbore pathway",
         "display_name": "Darkbore Pathway // Slitherbore Pathway",
         "image_url": "https://scryfall.com/card/khm/254/darkbore-pathway-slitherbore-pathway",
+        "usd_price": None,
     }
 
     cache.close()

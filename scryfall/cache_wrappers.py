@@ -61,10 +61,10 @@ class ScryfallCache:
             row[1].lower(): row[1]
             for row in self.conn.execute("PRAGMA table_info(cards)").fetchall()
         }
-        for column in ("display_name", "image_url"):
+        for column, definition in (("display_name", "TEXT"), ("image_url", "TEXT"), ("usd_price", "REAL")):
             if column not in columns:
                 self.conn.execute(
-                    f"ALTER TABLE cards ADD COLUMN {column} TEXT"
+                    f"ALTER TABLE cards ADD COLUMN {column} {definition}"
                 )
         self.conn.commit()
 
@@ -90,7 +90,7 @@ class ScryfallCache:
     def _lookup_row(self, card_name: str):
         normalized = self.normalize_name(card_name)
         row = self.conn.execute(
-            "SELECT name, display_name, image_url FROM cards WHERE name = ?",
+            "SELECT name, display_name, image_url, usd_price FROM cards WHERE name = ?",
             (normalized,),
         ).fetchone()
         if row is not None:
@@ -98,7 +98,7 @@ class ScryfallCache:
 
         for pattern in (f"{normalized} // %",):
             row = self.conn.execute(
-                "SELECT name, display_name, image_url FROM cards WHERE name LIKE ? ORDER BY LENGTH(name) LIMIT 1",
+                "SELECT name, display_name, image_url, usd_price FROM cards WHERE name LIKE ? ORDER BY LENGTH(name) LIMIT 1",
                 (pattern,),
             ).fetchone()
             if row is not None:
@@ -129,6 +129,7 @@ class ScryfallCache:
                 "name": normalized,
                 "display_name": display_name,
                 "image_url": None,
+                "usd_price": None,
             }
         display_name = row[1] or (card_name.strip() or normalized)
         if display_name.lower() == display_name:
@@ -137,6 +138,7 @@ class ScryfallCache:
             "name": normalized,
             "display_name": display_name,
             "image_url": row[2],
+            "usd_price": row[3],
         }
 
     def get_many_card_displays(self, card_names: Iterable[str]) -> dict[str, dict[str, str | None]]:
@@ -145,11 +147,11 @@ class ScryfallCache:
             return {}
         placeholders = ", ".join("?" for _ in normalized_names)
         rows = self.conn.execute(
-            f"SELECT name, display_name, image_url FROM cards WHERE name IN ({placeholders})",
+            f"SELECT name, display_name, image_url, usd_price FROM cards WHERE name IN ({placeholders})",
             normalized_names,
         ).fetchall()
         resolved = {name: self.get_card_display(name) for name in normalized_names}
-        for name, display_name, image_url in rows:
+        for name, display_name, image_url, usd_price in rows:
             final_display_name = display_name or self.normalize_name(name)
             if final_display_name.lower() == final_display_name:
                 final_display_name = self.format_display_name(final_display_name)
@@ -157,6 +159,7 @@ class ScryfallCache:
                 "name": name,
                 "display_name": final_display_name,
                 "image_url": image_url,
+                "usd_price": usd_price,
             }
         return resolved
  

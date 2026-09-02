@@ -7,3 +7,4 @@ frontend/.next/
 __pycache__/
 *.pyc
 *.tsbuildinfo
+.coverage

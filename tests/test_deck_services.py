@@ -8,7 +8,10 @@ import services.deck_service as deck_service
 from commander_specific import (
     group_missing_cards_by_tag,
     rank_functional_replacements_for_tag,
+    suggest_owned_synergy_cards,
+    suggest_same_type_replacements_for_missing_cards,
 )
+import commander_specific
 from models.collection import Collection
 from models.commander import Commander
 from models.deck import Deck
@@ -157,6 +160,55 @@ def test_group_missing_cards_by_all_functional_tags():
         "ramp": {"missing a", "missing b"},
         "draw": {"missing a"},
     }
+
+
+def test_suggest_owned_synergy_cards_excludes_deck_cards_and_sorts_by_synergy():
+    deck = make_deck("Test", {"already included"})
+    deck.set_categories(
+        {
+            "highsynergycards": [
+                {"name": " Already Included ", "synergy": 100},
+                {"name": "Not Owned", "synergy": 90},
+                {"name": "Lower Synergy", "synergy": 10},
+                {"name": "Higher Synergy", "synergy": 20},
+            ]
+        }
+    )
+
+    assert suggest_owned_synergy_cards(
+        deck,
+        {"lower synergy", "higher synergy"},
+    ) == [
+        {"name": "Higher Synergy", "synergy": 20},
+        {"name": "Lower Synergy", "synergy": 10},
+    ]
+
+
+def test_same_type_replacements_filters_unsupported_and_deck_cards(monkeypatch):
+    deck = make_deck("Test", {"missing creature", "missing unknown", "in deck"})
+    deck.set_categories(
+        {
+            "creatures": [
+                {"name": "Owned Low", "synergy": 1},
+                {"name": "Owned High", "synergy": 5},
+                {"name": "In Deck", "synergy": 100},
+                {"name": "Not Owned", "synergy": 50},
+            ]
+        }
+    )
+    cache = FakeScryfallCache(
+        {},
+        {
+            "missing creature": "Creature",
+            "missing unknown": "Battle",
+        },
+    )
+    monkeypatch.setattr(commander_specific, "ScryfallCache", lambda: cache)
+
+    assert suggest_same_type_replacements_for_missing_cards(
+        deck,
+        {"owned low", "owned high"},
+    ) == {"missing creature": ["Owned High", "Owned Low"]}
 
 
 def test_humanize_tag_label_formats_all_slug_variants():

@@ -1,5 +1,20 @@
 # EDH Bulk Up
 
+edhbulkup.com
+
+## What It Does
+
+I often see people ask on Reddit - what decks can I build with cards I already have? EDH Bulk Up hopes to answer that question.
+
+EDH Bulk Up takes the average decklists from EDHRec(www.edhrec.com) and compares them against the cards in a user's collection. It will give the user the percentage based
+on how many of the cards they already own. Then it gives suggestions for cards that could replace the cards the user is missing from the average decklist. The user
+can also choose to pick a distinct color identity, or choose to include/exclude certain colors.
+
+Card suggestions work on a combination of Scryfall(www.scryfall.com) tags and EDHRec data. First we identify what tags from the preset categories a card has on
+Scryfall (ramp, removal, etc). Then the tool finds all other cards that also have that tag that exist on a card's EDHRec page, but aren't in the average decklist.
+For each card/category EDH Bulk Up suggests those cards to replace the missing cards.
+
+## Installation Instructions
 EDH Bulk Up has two services that run at the same time:
 
 - a FastAPI/uvicorn backend (Python)

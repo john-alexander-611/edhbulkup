@@ -375,7 +375,7 @@ export default function HomePage() {
             height={180}
             priority
           />
-          <p className={styles.brandText}>Impact-Site-Verification: 5b991144-b0ca-48eb-b0c7-eaae68c5544e</p>
+          <p className={styles.brandText}>Find Decks Hidden in Your Bulk</p>
         </div>
         <p className={styles.collectionStatus}>{file ? "Collection loaded" : "No collection loaded"}</p>
       </header>

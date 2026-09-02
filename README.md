@@ -1,65 +1,93 @@
-# edhbulkup
 # EDH Bulk Up
 
-The app has two parts that need to run at the same time:
+EDH Bulk Up has two services that run at the same time:
 
 - a FastAPI/uvicorn backend (Python)
 - a Next.js frontend (npm)
 
-## Run the backend (uvicorn)
+## Prerequisites
 
-The frontend expects the API on **port 8001**, so start the backend with that port.
+- Python and Node.js/npm
+- GNU Make
 
-From the repository root in PowerShell:
-
-```powershell
-.\run_app.ps1 -Action start -Port 8001
-```
-
-Use `restart` after code changes, or `stop` to release the port:
+On Windows, install GNU Make once:
 
 ```powershell
-.\run_app.ps1 -Action restart -Port 8001
-.\run_app.ps1 -Action stop -Port 8001
+winget install -e --id GnuWin32.Make
 ```
 
-If GNU Make is installed, `make start` / `make restart` / `make stop` run the same script on the default port (8000) — pass a port explicitly if you need 8001.
+Restart VS Code or open a new terminal afterward so `make` is available on the `PATH`. You can use either PowerShell or Git Bash; the Make targets work from both.
 
-The backend is then available at http://127.0.0.1:8001.
-
-## Run the frontend (Next.js)
-
-In a separate terminal, from the repository root:
+Install project dependencies from the repository root:
 
 ```powershell
-cd .\frontend
-npm install
-npm run dev
+python -m pip install -r requirements.txt
+npm --prefix frontend install
 ```
 
-Then open the app in your browser:
+## Run the application
 
-```text
-http://localhost:3000
-```
-
-If port 3000 is already occupied, Next.js will automatically select the next available port, such as 3001.
-
-The frontend reads the API base URL from `frontend/.env.example` / `.env.local` (`NEXT_PUBLIC_API_BASE_URL`), which defaults to http://127.0.0.1:8001 — make sure this matches the port the backend is running on.
-
-## Tests
+From the repository root, use separate terminals for the two long-running servers:
 
 ```powershell
+make run-backend
+make run-frontend
+```
+
+The backend runs at `http://127.0.0.1:8001` and the frontend runs at `http://localhost:3000`.
+
+The Make targets run these commands:
+
+```powershell
+python -m uvicorn app.main:app --host 127.0.0.1 --port 8001
+npm run dev -- --port 3000
+```
+
+For the direct frontend command, run it from `frontend/`. The Make target runs it there automatically.
+
+Override ports when they are occupied:
+
+```powershell
+make run-backend BACKEND_PORT=8002
+make run-frontend FRONTEND_PORT=3001
+```
+
+In Git Bash, the backend override can also be written as:
+
+```bash
+BACKEND_PORT=8002 make run-backend
+```
+
+## Build and test
+
+```powershell
+make build
 make test
+make run-tests
 ```
 
-## Frontend build check
+`make build` runs the production Next.js build. `make test` and `make run-tests` both run the Python test suite.
 
-To verify the Next.js app compiles cleanly:
+### Coverage
+
+Install the coverage plugin once:
 
 ```powershell
-cd .\frontend
-npm run build
+python -m pip install pytest-cov
 ```
 
-This is useful after making UI or routing changes.
+Run the focused application coverage report:
+
+```powershell
+python -m pytest --cov=app --cov=models --cov=services --cov=scryfall --cov=parse_input --cov=commander_specific --cov=find_deck_matches --cov-report=term-missing -q
+```
+
+This excludes standalone cache-building scripts from the metric while reporting coverage for application code.
+
+## API configuration
+
+The frontend reads `NEXT_PUBLIC_API_BASE_URL` from `frontend/.env.local`; it defaults to `http://127.0.0.1:8001`. To use an overridden backend port, add this line to `frontend/.env.local`:
+
+```dotenv
+NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8002
+```

@@ -5,8 +5,17 @@ import Link from "next/link";
 import { FormEvent, useEffect, useState, useRef } from "react";
 import { buildCommanderRoute, clearCollection, getCommanderSuggestions, searchCommanders, uploadCollection, type DeckMatch } from "@/lib/api";
 import styles from "./page.module.css";
+import { Analytics } from "@vercel/analytics/next"
 
 const colors = ["W", "U", "B", "R", "G", "C"];
+const colorNames: Record<string, string> = {
+  W: "White",
+  U: "Blue",
+  B: "Black",
+  R: "Red",
+  G: "Green",
+  C: "Colorless",
+};
 const STORAGE_KEY = "edh-bulk-up-state-v1";
 const PAGE_SIZE = 20;
 
@@ -57,7 +66,7 @@ export default function HomePage() {
   const [excludePartners, setExcludePartners] = useState(true);
   const [onlyOwnedCommanders, setOnlyOwnedCommanders] = useState(true);
   const [results, setResults] = useState<DeckMatch[]>([]);
-  const [message, setMessage] = useState("Upload your collection CSV to begin.");
+  const [message, setMessage] = useState("Upload your collection to begin. .csv exports from Moxfield and Archidekt are supported, as well as .txt files with quantity and cardname.");
   const [loading, setLoading] = useState(false);
   const [totalResults, setTotalResults] = useState(0);
   const [page, setPage] = useState(1);
@@ -91,7 +100,7 @@ export default function HomePage() {
       setExcludePartners(session.excludePartners ?? true);
       setOnlyOwnedCommanders(session.onlyOwnedCommanders ?? true);
       setResults(Array.isArray(session.results) ? session.results : []);
-      setMessage(session.message ?? "Upload your collection CSV to begin.");
+      setMessage(session.message ?? "Upload your collection to begin. .csv exports from Moxfield and Archidekt are supported, as well as .txt files with quantity and cardname.");
 
       if (session.fileName && session.fileDataUrl) {
         void (async () => {
@@ -270,7 +279,7 @@ export default function HomePage() {
       setCommanderName("");
       setSuggestions([]);
       setShowSuggestions(false);
-      setMessage("Upload your collection CSV to begin.");
+      setMessage("Upload your collection to begin..csv exports from Moxfield and Archidekt are supported, as well as .txt files with quantity and cardname.");
       window.localStorage.removeItem(STORAGE_KEY);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to clear collection.");
@@ -282,7 +291,7 @@ export default function HomePage() {
   async function handleSearch(event: FormEvent) {
     event.preventDefault();
     if (!file) {
-      setMessage("Upload your collection CSV before searching.");
+      setMessage("Upload your collection before searching. .csv exports from Moxfield and Archidekt are supported, as well as .txt files with quantity and cardname.");
       return;
     }
     await fetchPage(1);
@@ -382,9 +391,9 @@ export default function HomePage() {
                 </label>
                 <label className={styles.field}>Advanced filters
                   <div className={styles.colors}>
-                    <label><input type="checkbox" checked={excludeFace} onChange={() => setExcludeFace((value) => !value)} /> Exclude Face Commanders</label>
-                    <label><input type="checkbox" checked={excludePartners} onChange={() => setExcludePartners((value) => !value)} /> Exclude Partner Commanders</label>
-                    <label><input type="checkbox" checked={onlyOwnedCommanders} onChange={() => setOnlyOwnedCommanders((value) => !value)} /> Only Owned Commanders</label>
+                    <label title="Exclude the face commanders from precons"><input type="checkbox" checked={excludeFace} onChange={() => setExcludeFace((value) => !value)} /> Exclude Face Commanders</label>
+                    <label title="Exclude commmanders with partner"><input type="checkbox" checked={excludePartners} onChange={() => setExcludePartners((value) => !value)} /> Exclude Partner Commanders</label>
+                    <label title="Exclude any commanders you don't already own"><input type="checkbox" checked={onlyOwnedCommanders} onChange={() => setOnlyOwnedCommanders((value) => !value)} /> Only Owned Commanders</label>
                   </div>
                 </label>
             </div>
@@ -464,9 +473,9 @@ function Pagination({ page, totalPages, disabled, onPageChange }: { page: number
 }
 
 function ColorGroup({ label, values, colorType, onColorChange }: { label: string; values: string[]; colorType?: 'identity' | 'contains' | 'exclude'; onColorChange?: (color: string, type: 'identity' | 'contains' | 'exclude') => void }) {
-  const isIdentity = label === 'Exact identity';
+  const isIdentity = label === 'Exact Color Identity';
   const displayColors = isIdentity ? colors : colors.filter((c) => c !== 'C');
   return <fieldset className={styles.colors}><legend>{label}</legend>{displayColors.map((color) => (
-    <label key={color} aria-label={color}><input type="checkbox" checked={values.includes(color)} onChange={() => onColorChange && colorType ? onColorChange(color, colorType) : undefined} /><img className={styles.manaSymbol} src={`/mana/${color}.svg`} alt={color} /></label>
+    <label key={color} aria-label={color} title={colorNames[color] ?? color}><input type="checkbox" checked={values.includes(color)} onChange={() => onColorChange && colorType ? onColorChange(color, colorType) : undefined} /><img className={styles.manaSymbol} src={`/mana/${color}.svg`} alt={color} title={colorNames[color] ?? color} /></label>
   ))}</fieldset>;
 }

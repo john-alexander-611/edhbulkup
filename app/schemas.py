@@ -13,6 +13,7 @@ class CardPresentationResponse(BaseModel):
     name: str
     display_name: str
     image_url: str | None = None
+    usd_price: float | None = None
 
 
 class DecklistCardResponse(CardPresentationResponse):

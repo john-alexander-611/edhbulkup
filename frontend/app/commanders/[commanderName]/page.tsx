@@ -43,11 +43,20 @@ function scryfallCardUrl(cardName: string) {
   return `https://scryfall.com/search?q=${encodeURIComponent(cardName)}`;
 }
 
+type BudgetLimit = "any" | "five" | "one";
+
+const budgetLimits: Record<BudgetLimit, number | null> = {
+  any: null,
+  five: 5,
+  one: 1,
+};
+
 export default function CommanderPage() {
   const params = useParams<{ commanderName?: string | string[] }>();
   const [analysis, setAnalysis] = useState<DeckAnalysis | null>(null);
   const [error, setError] = useState("");
   const [expandedSuggestionGroups, setExpandedSuggestionGroups] = useState<Record<string, boolean>>({});
+  const [budgetLimit, setBudgetLimit] = useState<BudgetLimit>("any");
 
   const commanderName = Array.isArray(params.commanderName)
     ? params.commanderName[0]
@@ -100,14 +109,28 @@ export default function CommanderPage() {
       </div>
     </section>
     <section><h2>Missing cards</h2><ul className={styles.missingList}>{analysis.missing_card_details.map((card) => <li key={card.name}><strong>{analysis.average_decklist.find((deckCard) => deckCard.name === card.name)?.quantity ?? 1}</strong><Card card={card} /></li>)}</ul></section>
-    <section><h2>Replacement Recommendations by Category</h2>{analysis.replacements_by_tag.map((group) => {
+    <section>
+      <div className={styles.replacementHeader}>
+        <h2>Replacement Recommendations by Category</h2>
+        <fieldset className={styles.budgetOptions}>
+          <legend>Budget</legend>
+          <label><input type="radio" name="budget" value="any" checked={budgetLimit === "any"} onChange={() => setBudgetLimit("any")} /> No budget limit</label>
+          <label><input type="radio" name="budget" value="five" checked={budgetLimit === "five"} onChange={() => setBudgetLimit("five")} /> $5 and under per card</label>
+          <label><input type="radio" name="budget" value="one" checked={budgetLimit === "one"} onChange={() => setBudgetLimit("one")} /> $1 and under per card</label>
+        </fieldset>
+      </div>
+      {analysis.replacements_by_tag.map((group) => {
       const isExpanded = expandedSuggestionGroups[group.tag];
-      const visibleReplacements = isExpanded ? group.replacement_details : group.replacement_details.slice(0, 10);
-      const hasMoreSuggestions = group.replacement_details.length > 10 && !isExpanded;
+      const maxPrice = budgetLimits[budgetLimit];
+      const budgetedReplacements = maxPrice === null
+        ? group.replacement_details
+        : group.replacement_details.filter((card) => card.usd_price !== null && card.usd_price <= maxPrice);
+      const visibleReplacements = isExpanded ? budgetedReplacements : budgetedReplacements.slice(0, 10);
+      const hasMoreSuggestions = budgetedReplacements.length > 10 && !isExpanded;
 
       return <article className={styles.group} key={group.tag}><h3>Category: {formatTagLabel(group.tag)}</h3>
         <div className={styles.subsection}><h4 className={styles.missingHeading}>Missing Cards</h4>{group.missing_card_details?.length ? <CardList cards={group.missing_card_details} /> : <p>Missing: {group.missing_cards.join(", ") || "None"}</p>}</div>
-        <div className={styles.subsection}><h4 className={styles.replacementHeading}>Suggested Replacements</h4><CardList cards={visibleReplacements} />{hasMoreSuggestions ? <button className={styles.moreSuggestions} type="button" onClick={() => setExpandedSuggestionGroups((groups) => ({ ...groups, [group.tag]: true }))}>More suggestions</button> : null}</div>
+        <div className={styles.subsection}><h4 className={styles.replacementHeading}>Suggested Replacements</h4>{visibleReplacements.length ? <CardList cards={visibleReplacements} /> : <p>No suggestions meet this budget.</p>}{hasMoreSuggestions ? <button className={styles.moreSuggestions} type="button" onClick={() => setExpandedSuggestionGroups((groups) => ({ ...groups, [group.tag]: true }))}>More suggestions</button> : null}</div>
       </article>;
     })}</section>
   </main>;

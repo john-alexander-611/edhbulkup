@@ -98,18 +98,7 @@ def parse_plaintext_collection(fileobj) -> dict[str, int]:
 
 
 def owned_card_set(collection: dict[str, int] | Collection) -> set[str]:
-    """
-    Returns just the set of normalized card names owned, discarding quantity.
-
-    Commander decks are singleton, so for the vast majority of cards only
-    presence matters - "do they own this card at all". Quantity only
-    matters for a small, specific list of cards that allow multiples in a
-    single deck (Relentless Rats, Dragon's Approach, Rat Colony, Persistent
-    Petitioners, Shadowborn Apostle, Nazgul, etc). That list isn't handled
-    yet - `collection` (the full dict with counts) is kept around so the
-    matcher can special-case those specific cards later without needing to
-    re-parse the CSV.
-    """
+    """Return just the set of normalized card names owned, discarding quantity."""
     return set(collection if isinstance(collection, dict) else collection.names)
 
 

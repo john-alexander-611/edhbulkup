@@ -50,6 +50,7 @@ TAG_CATEGORIES = [
 
 
 def init_db(conn: sqlite3.Connection):
+    """Drop and recreate the card_tags table."""
     conn.executescript("""
         DROP TABLE IF EXISTS card_tags;
 
@@ -64,6 +65,11 @@ def init_db(conn: sqlite3.Connection):
 
 
 async def get_oracle_tags_url(client: httpx.AsyncClient) -> str:
+    """Look up the current download URL for Scryfall's oracle_tags bulk file.
+
+    Raises:
+        RuntimeError: If no oracle_tags entry is found in the bulk-data listing.
+    """
     resp = await client.get(BULK_DATA_INDEX_URL)
     resp.raise_for_status()
     for entry in resp.json().get("data", []):
@@ -73,6 +79,7 @@ async def get_oracle_tags_url(client: httpx.AsyncClient) -> str:
 
 
 async def download_all_tags(client: httpx.AsyncClient, url: str) -> list[dict]:
+    """Stream and decompress the gzipped JSONL oracle_tags file into a list of tag dicts."""
     entries = []
     decompressor = zlib.decompressobj(zlib.MAX_WBITS | 16)
     line_buffer = b""
@@ -132,6 +139,7 @@ def compute_subtree_reach(tags_by_id: dict[str, dict]) -> dict[str, set[str]]:
 
 
 def build_oracle_id_to_name(scryfall_conn: sqlite3.Connection) -> dict[str, str]:
+    """Build an oracle_id-to-card-name mapping from the Scryfall cache, used to resolve tag taggings to names."""
     rows = scryfall_conn.execute(
         "SELECT oracle_id, name FROM cards WHERE oracle_id IS NOT NULL"
     ).fetchall()
@@ -139,6 +147,7 @@ def build_oracle_id_to_name(scryfall_conn: sqlite3.Connection) -> dict[str, str]
 
 
 async def build_cache():
+    """Download Scryfall's oracle_tags bulk file and rebuild tag_cache.sqlite from it, for each tag in TAG_CATEGORIES."""
     scryfall_conn = sqlite3.connect(SCRYFALL_DB_PATH)
     oracle_id_to_name = build_oracle_id_to_name(scryfall_conn)
     scryfall_conn.close()

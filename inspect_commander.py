@@ -15,6 +15,15 @@ from services.deck_service import analyze_deck, load_collection, load_decks
 
 
 async def inspect_commander(deck: Deck, owned_cards: set[str]) -> list[dict]:
+    """Fetch a deck's EDHREC categories and return owned high-synergy cards missing from its average decklist.
+
+    Args:
+        deck: Deck to analyze; mutated in place with fetched categories.
+        owned_cards: Lowercased, stripped card names the user owns.
+
+    Returns:
+        list[dict]: Owned synergy card dicts, sorted by synergy score (highest first).
+    """
     async with httpx.AsyncClient(timeout=20) as client:
         categories = await fetch_commander_page_categories(client, deck.name)
     deck.set_categories(categories)

@@ -35,6 +35,7 @@ from services.deck_service import add_recommendations, analyze_deck, count_deck_
 from scryfall.cache_wrappers import ScryfallCache, TagCache
 
 def get_allowed_origins() -> list[str]:
+    """CORS-allowed origins from CORS_ALLOWED_ORIGINS env var, or a localhost dev default."""
     configured = os.getenv("CORS_ALLOWED_ORIGINS", "")
     origins = [
         origin.strip().rstrip("/")
@@ -64,6 +65,7 @@ app.add_middleware(
 
 
 def humanize_tag_label(tag: str) -> str:
+    """Convert a functional tag slug (e.g. "card-advantage") to a display label (e.g. "Card Advantage")."""
     if not tag:
         return tag
 
@@ -84,6 +86,15 @@ def humanize_tag_label(tag: str) -> str:
 
 
 def build_card_details(cards: list[str] | tuple[str, ...], lookup):
+    """Resolve card names to CardPresentationResponse objects via lookup, deduped and sorted.
+
+    Args:
+        cards: Card names to resolve.
+        lookup: Callable(list[str]) -> dict[str, dict] mapping name to display metadata.
+
+    Returns:
+        list[CardPresentationResponse]: Resolved cards, skipping any lookup misses.
+    """
     card_names = sorted(dict.fromkeys(card for card in cards if card and card.strip()))
     if not card_names:
         return []
@@ -101,6 +112,11 @@ def build_card_details(cards: list[str] | tuple[str, ...], lookup):
 
 
 def get_uploaded_collection() -> Collection:
+    """Return the collection uploaded in this app session.
+
+    Raises:
+        HTTPException: 400 if no collection has been uploaded yet.
+    """
     collection = getattr(app.state, "collection", None)
     if collection is None:
         raise HTTPException(
@@ -110,12 +126,14 @@ def get_uploaded_collection() -> Collection:
     return collection
 
 def clear_uploaded_collection() -> None:
+    """Remove the uploaded collection from app state, if present."""
     if hasattr(app.state, "collection"):
         delattr(app.state, "collection")
 
 
 @app.get("/health")
 def health() -> dict[str, str]:
+    """Liveness check endpoint."""
     return {"status": "ok"}
 
 
@@ -136,6 +154,11 @@ def search_commanders(
     limit: int = Query(default=20, ge=1, le=50),
     offset: int = Query(default=0, ge=0),
 ):
+    """Search cached decks by color/name filters, matched against the uploaded collection.
+
+    Raises:
+        HTTPException: 400 if no collection has been uploaded yet.
+    """
     collection = get_uploaded_collection()
     filters = []
 
@@ -195,11 +218,17 @@ def search_commanders(
 
 @app.get("/api/commanders/suggestions")
 def commander_suggestions(q: str = Query(default="")):
+    """Return up to 15 cached commander names matching query q."""
     return {"suggestions": get_commander_suggestions(q, limit=15)}
 
 
 @app.get("/api/commanders/{commander_name}", response_model=DeckAnalysisResponse)
 async def commander_analysis(commander_name: str):
+    """Fetch EDHREC data for a commander and return a full analysis against the uploaded collection.
+
+    Raises:
+        HTTPException: 404 if commander_name has no cached deck; 400 if no collection uploaded.
+    """
     deck_map = get_decks()
     deck = deck_map.get(commander_name)
     if deck is None:
@@ -288,6 +317,7 @@ async def commander_analysis(commander_name: str):
 
 @app.post("/api/collection/upload", response_model=UploadCollectionResponse)
 def upload_collection(file: UploadFile = File(...)):
+    """Parse an uploaded collection file (.txt plaintext or Moxfield CSV) and store it in app state."""
     content = file.file.read()
     decoded_content = content.decode("utf-8-sig")
     if Path(file.filename or "").suffix.lower() == ".txt":
@@ -303,6 +333,7 @@ def upload_collection(file: UploadFile = File(...)):
     
 @app.post("/api/collection/clear")
 def clear_collection():
+    """Clear the uploaded collection from app state."""
     clear_uploaded_collection()
     return {"status": "success"}
 

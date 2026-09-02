@@ -8,6 +8,7 @@ _DIR = Path(__file__).parent
 
 
 def create_commander_json():
+    """Export cache.sqlite's commanders/decklist_cards tables to commander_data.json."""
     conn = sqlite3.connect(str(_DIR.parent / "cache.sqlite"))
 
     commander_data = {}

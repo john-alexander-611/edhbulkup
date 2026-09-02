@@ -27,6 +27,7 @@ BULK_DATA_INDEX_URL = "https://api.scryfall.com/bulk-data"
 
 
 def resolve_image_url(card: dict) -> str | None:
+    """Pick the best available image URL from a Scryfall card object, checking card faces if the card itself has none."""
     image_uris = (card.get("image_uris") or {})
     if image_uris:
         for key in ("normal", "large", "small", "png", "border_crop", "art_crop"):
@@ -45,6 +46,7 @@ def resolve_image_url(card: dict) -> str | None:
 
 
 def init_db(conn: sqlite3.Connection):
+    """Drop and recreate the cards table."""
     conn.executescript("""
         DROP TABLE IF EXISTS cards;
 
@@ -91,6 +93,7 @@ async def get_oracle_cards_download_url(client: httpx.AsyncClient) -> str:
 
 
 def normalize(name: str) -> str:
+    """Lowercase and strip a card name for use as a lookup key."""
     return name.strip().lower()
 
 
@@ -106,6 +109,10 @@ SKIP_LAYOUTS = {
 
 
 def add_split_card_aliases(card: dict, batch: list[tuple]) -> None:
+    """Append a cache row for a split card's front-face name too, if it differs from the full card name.
+
+    Lets lookups by just the front face (e.g. "Fire" for "Fire // Ice") resolve correctly.
+    """
     faces = card.get("card_faces") or []
     if len(faces) < 2:
         return
@@ -132,6 +139,7 @@ def add_split_card_aliases(card: dict, batch: list[tuple]) -> None:
 
 
 async def build_cache():
+    """Download the Scryfall oracle_cards bulk file and rebuild scryfall_cache.sqlite from it."""
     conn = sqlite3.connect(DB_PATH)
     init_db(conn)
 

@@ -23,6 +23,14 @@ DeckFilter: TypeAlias = Callable[[Deck], bool]
 
 
 def load_decks(json_path: Path | None = None) -> dict[str, Deck]:
+    """Load cached commander data into Decks, keyed by commander name.
+
+    Args:
+        json_path: Path to commander_data.json; defaults to create_cache/commander_data.json.
+
+    Returns:
+        dict[str, Deck]: Commander name to Deck.
+    """
     path = json_path or Path(__file__).parent.parent / "create_cache" / "commander_data.json"
     with open(path, "r") as file:
         json_data = json.load(file)
@@ -30,6 +38,7 @@ def load_decks(json_path: Path | None = None) -> dict[str, Deck]:
 
 
 def load_collection(path: str) -> Collection:
+    """Parse a Moxfield-format CSV at path into a Collection."""
     return Collection(parse_moxfield_csv(path))
 
 
@@ -40,6 +49,21 @@ def search_decks(
     limit: int = 20,
     offset: int = 0,
 ) -> list[DeckMatchResult]:
+    """Score decks against a collection and return the top matches, best score first.
+
+    Args:
+        decks: Decks to score.
+        collection: Owned cards to match against.
+        filters: Predicates a deck must pass to be included.
+        limit: Maximum number of results to return.
+        offset: Number of top results to skip (for pagination).
+
+    Returns:
+        list[DeckMatchResult]: Matches sorted by match_score descending, then name.
+
+    Raises:
+        ValueError: If limit < 1 or offset < 0.
+    """
     if limit < 1:
         raise ValueError("Search result limit must be positive")
     if offset < 0:
@@ -61,11 +85,13 @@ def search_decks(
 
 
 def count_deck_matches(decks: Iterable[Deck], filters: Iterable[DeckFilter] = ()) -> int:
+    """Count decks passing all filters, without scoring or sorting."""
     filters = tuple(filters)
     return sum(1 for deck in decks if all(deck_filter(deck) for deck_filter in filters))
 
 
 def analyze_deck(deck: Deck, collection: Collection) -> DeckAnalysisResult:
+    """Build a basic match/missing-cards analysis for one deck against a collection (no tag/replacement recommendations)."""
     missing_cards = deck.missing_cards(collection.names)
     return DeckAnalysisResult(
         commander_name=deck.name,
@@ -85,6 +111,19 @@ def add_recommendations(
     scryfall_cache: ScryfallCache,
     tag_cache: TagCache,
 ) -> DeckAnalysisResult:
+    """Return a copy of analysis enriched with tag-grouped, same-type, and synergy recommendations.
+
+    Args:
+        analysis: Base analysis from analyze_deck.
+        deck: Deck being analyzed.
+        collection: Owned cards.
+        scryfall_cache: Source of card types/color identities.
+        tag_cache: Source of functional tags.
+
+    Returns:
+        DeckAnalysisResult: New instance with missing_by_tag, replacements_by_tag,
+            owned_synergy_cards, and same_type_replacements populated.
+    """
     owned_cards = collection.names
     missing_by_tag = group_missing_cards_by_tag(
         set(analysis.missing_cards), tag_cache

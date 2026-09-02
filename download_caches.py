@@ -65,6 +65,7 @@ def download_from_github_api():
 
 
 def ensure_caches():
+    """Download missing cache files (see CACHE_FILES) from the GitHub release, skipping any already present."""
     download_from_github_api()
 
 

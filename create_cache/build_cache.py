@@ -32,9 +32,7 @@ CONCURRENCY = 5
 
 
 def init_db(conn: sqlite3.Connection):
-    # Drop and recreate on every run - build_cache.py is meant to be re-run
-    # (weekly refresh, or after a bug fix like this one), and without this
-    # old rows just accumulate underneath the new ones.
+    """Drop and recreate the commanders/decklist_cards tables (safe to re-run on refresh)."""
     conn.executescript("""
         DROP TABLE IF EXISTS decklist_cards;
         DROP TABLE IF EXISTS commanders;
@@ -76,6 +74,7 @@ async def fetch_decklist_worker(
     conn: sqlite3.Connection,
     name: str,
 ):
+    """Fetch and store one commander's average decklist, bounded by sem for concurrency."""
     async with sem:
         cards = await fetch_average_deck(client, name)
 
@@ -93,6 +92,7 @@ async def fetch_decklist_worker(
 
 
 async def main():
+    """Rebuild cache.sqlite from EDHREC: gather commanders, filter by MIN_DECKS, fetch decklists, then export JSON."""
     conn = sqlite3.connect(DB_PATH)
     init_db(conn)
 

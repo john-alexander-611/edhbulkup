@@ -4,6 +4,18 @@ from scryfall.cache_wrappers import ScryfallCache, TagCache
 
 
 def get_missing_cards(commander_name: str, owned_cards: set[str]) -> set[str]:
+    """Look up a cached commander's deck and print/return cards not in owned_cards.
+
+    Args:
+        commander_name: Exact commander name as cached.
+        owned_cards: Lowercased, stripped card names the user owns.
+
+    Returns:
+        set[str]: Card names from the average decklist not in owned_cards.
+
+    Raises:
+        ValueError: If commander_name has no cached deck.
+    """
     from services.deck_service import load_decks
 
     all_commanders = load_decks()
@@ -17,6 +29,15 @@ def get_missing_cards(commander_name: str, owned_cards: set[str]) -> set[str]:
 
 
 def suggest_owned_synergy_cards(deck: Deck, owned_cards: set[str]) -> list[dict]:
+    """Find owned high-synergy cards for a deck that aren't already in its average decklist.
+
+    Args:
+        deck: Deck to check, with EDHREC categories already loaded.
+        owned_cards: Lowercased, stripped card names the user owns.
+
+    Returns:
+        list[dict]: Matching card dicts, sorted by synergy score (highest first).
+    """
     high_synergy_cards = deck.get_category("high_synergy_cards")
 
     suggestions = []
@@ -120,6 +141,17 @@ def suggest_functional_replacements(
     scryfall_cache: ScryfallCache,
     tag_cache: TagCache,
 ) -> dict[str, list[str]]:
+    """Suggest owned, legal replacements for a deck's missing cards, grouped by function tag.
+
+    Args:
+        deck: Deck to analyze.
+        owned_cards: Lowercased, stripped card names the user owns.
+        scryfall_cache: Source of card color identities.
+        tag_cache: Source of functional tags and tag membership.
+
+    Returns:
+        dict[str, list[str]]: Tag name to ranked replacement card names, omitting tags with no replacements.
+    """
     edhrec_suggestions = deck.get_all_edhrec_suggestions()
     missing_by_tag = group_missing_cards_by_tag(
         deck.missing_cards(owned_cards), tag_cache

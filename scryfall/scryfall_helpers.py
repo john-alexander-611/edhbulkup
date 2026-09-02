@@ -4,6 +4,7 @@ from scryfall.cache_wrappers import ScryfallCache
 
 
 def filter_legal_cards(scryfall_cache: ScryfallCache, candidates: list[str], commander: Commander) -> list[str]:
+    """Return candidates whose color identity is legal under commander."""
     return [
         name for name in candidates
         if commander.is_card_legal(scryfall_cache.get_color_identity(name) or "")

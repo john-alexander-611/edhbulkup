@@ -52,6 +52,7 @@ def slugify(name: str) -> str:
 
 
 def normalize_identity(bucket_key: str) -> str:
+    """Convert an EDHREC color-identity bucket key (e.g. "colorless", "wu") to our letter-code format ("C", "WU")."""
     return "C" if bucket_key == "colorless" else bucket_key.upper()
 
 

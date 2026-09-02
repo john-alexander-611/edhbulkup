@@ -10,6 +10,11 @@ class Card:
     type_line: str | None = None
 
     def __post_init__(self) -> None:
+        """Normalize name to lowercase/stripped.
+
+        Raises:
+            ValueError: If name is blank after stripping.
+        """
         normalized_name = self.name.strip().lower()
         if not normalized_name:
             raise ValueError("Card name cannot be empty")

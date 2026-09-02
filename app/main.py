@@ -93,7 +93,7 @@ def build_card_details(cards: list[str] | tuple[str, ...], lookup):
             name=card_name,
             display_name=card_meta_lookup[card_name]["display_name"],
             image_url=card_meta_lookup[card_name]["image_url"],
-            usd_price=card_meta_lookup[card_name]["usd_price"],
+            usd_price=card_meta_lookup[card_name].get("usd_price"),
         )
         for card_name in card_names
         if card_name in card_meta_lookup and card_meta_lookup[card_name] is not None

@@ -2,9 +2,10 @@ import os
 import urllib.request
 from pathlib import Path
 
-REPO = "john-alexander-611/edhbulkup" 
+REPO = "john-alexander-611/edhbulkup"
 RELEASE_TAG = "latest-caches"
 BASE_URL = f"https://github.com/{REPO}/releases/download/{RELEASE_TAG}"
+TOKEN = os.getenv("GITHUB_TOKEN")
 
 CACHE_FILES = [
     "scryfall_cache.sqlite",

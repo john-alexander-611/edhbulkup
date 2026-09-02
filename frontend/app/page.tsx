@@ -66,7 +66,7 @@ export default function HomePage() {
   const [excludePartners, setExcludePartners] = useState(true);
   const [onlyOwnedCommanders, setOnlyOwnedCommanders] = useState(true);
   const [results, setResults] = useState<DeckMatch[]>([]);
-  const [message, setMessage] = useState("Upload your collection to begin. .csv exports from Moxfield and Archidekt are supported, as well as .txt files with quantity and cardname.");
+  const [message, setMessage] = useState("Upload your collection to begin (.csv exports from Moxfield/Archidekt, or .txt), or try our sample collection to see how it works!");
   const [loading, setLoading] = useState(false);
   const [totalResults, setTotalResults] = useState(0);
   const [page, setPage] = useState(1);
@@ -267,6 +267,42 @@ export default function HomePage() {
     }
   }
 
+  async function handleLoadSampleCollection() {
+    setLoading(true);
+    try {
+      const res = await fetch("/sample_collection.csv");
+      if (!res.ok) throw new Error("Could not load sample collection file.");
+      const blob = await res.blob();
+      const sampleFile = new File([blob], "sample_collection.csv", { type: "text/csv" });
+      const response = await uploadCollection(sampleFile);
+      setFile(sampleFile);
+      setMessage(`${response.owned_count} unique cards loaded from sample collection.`);
+
+      const { results: matches, total } = await searchCommanders({
+        name: commanderName,
+        identity: identity.join(""),
+        contains: contains.join(""),
+        exclude: exclude.join(""),
+        exclude_commanders: excludedCommanders,
+        exclude_face: excludeFace,
+        exclude_partners: excludePartners,
+        only_owned_commanders: onlyOwnedCommanders,
+        limit: PAGE_SIZE,
+        offset: 0,
+      });
+      if (!Array.isArray(matches) || typeof total !== "number") {
+        throw new Error("The search API returned an invalid response.");
+      }
+      setResults(matches);
+      setTotalResults(total);
+      setPage(1);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Unable to load sample collection.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
   async function handleClearCollection() {
     setLoading(true);
     try {
@@ -279,7 +315,7 @@ export default function HomePage() {
       setCommanderName("");
       setSuggestions([]);
       setShowSuggestions(false);
-      setMessage("Upload your collection to begin..csv exports from Moxfield and Archidekt are supported, as well as .txt files with quantity and cardname.");
+      setMessage("Upload your collection to begin (.csv exports from Moxfield/Archidekt, or .txt), or try our sample collection to see how it works!");
       window.localStorage.removeItem(STORAGE_KEY);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Unable to clear collection.");
@@ -349,8 +385,22 @@ export default function HomePage() {
             <h2>Collection</h2>
             <input ref={fileInputRef} type="file" accept=".csv,.txt,text/plain" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
             {file && <p className={styles.fileName}>Current File: {file.name}</p>}
-            <button type="submit" disabled={!file || loading}>Upload Collection</button>
-            <button type="button" className={styles.clearCollection} onClick={handleClearCollection} disabled={loading}>Clear Collection</button>
+            <div className={styles.collectionActions}>
+              <button type="submit" disabled={!file || loading}>Upload Collection</button>
+              <button type="button" className={styles.sampleCollection} onClick={handleLoadSampleCollection} disabled={loading}>
+                {loading && !file ? "Loading Demo..." : "Try Sample Collection"}
+              </button>
+              {file && (
+                <button type="button" className={styles.clearCollection} onClick={handleClearCollection} disabled={loading}>
+                  Clear Collection
+                </button>
+              )}
+            </div>
+            <div className={styles.sampleDownloadRow}>
+              <a href="/sample_collection.csv" download="sample_collection.csv" className={styles.sampleDownloadLink}>
+                Download sample CSV
+              </a>
+            </div>
             <p className={styles.hint}>{message}</p>
           </form>
           <form onSubmit={handleSearch} className={`${styles.card} ${styles.filterCard}`}>
@@ -401,7 +451,16 @@ export default function HomePage() {
         </aside>
         <section className={styles.results}>
           <div className={styles.resultsHeader}><h2>Commander Matches</h2><span>{totalResults} results</span></div>
-          {results.length === 0 ? <p className={styles.empty}>Your commander matches will appear here.</p> : results.map((result) => (
+          {results.length === 0 ? (
+            <div className={styles.empty}>
+              <p>Your commander matches will appear here.</p>
+              {!file && (
+                <button type="button" className={styles.emptySampleBtn} onClick={handleLoadSampleCollection} disabled={loading}>
+                  {loading ? "Loading Demo..." : "Load Sample Collection to See Demo Matches"}
+                </button>
+              )}
+            </div>
+          ) : results.map((result) => (
             <Link className={styles.result} href={buildCommanderRoute(result.commander_name)} key={result.commander_name}>
               <div className={styles.resultImageWrap}>
                 {result.image_url ? (

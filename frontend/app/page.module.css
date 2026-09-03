@@ -1,9 +1,10 @@
 .shell { max-width: 1440px; margin: 0 auto; padding: 24px 32px 56px; }
-.hero { display: flex; align-items: center; justify-content: space-between; gap: 24px; min-height: 58px; padding: 0 0 16px; border-bottom: 1px solid var(--border); margin-bottom: 18px; }
-.brand { display: flex; align-items: center; gap: 12px; }
+.hero { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 24px; min-height: 58px; padding: 0 0 16px; border-bottom: 1px solid var(--border); margin-bottom: 18px; }
+.brand { display: flex; align-items: center; gap: 12px; justify-self: start; }
 .logo { display: block; width: 175px; height: auto; }
-.brandText { margin: 0; color: var(--text-muted); font-size: 20px; font-weight: 500; white-space: nowrap; }
-.collectionStatus { margin: 0; padding: 5px 8px; border: 1px solid var(--border); border-radius: 4px; color: var(--text-muted); font-size: 11px; font-weight: 650; }
+.brandText { justify-self: center; margin: 0; color: var(--text-muted); font-size: 20px; font-weight: 500; white-space: nowrap; text-align: center; }
+.heroSpacer { justify-self: end; }
+.collectionStatus { margin: 0; padding: 5px 8px; border: 1px solid var(--border); border-radius: 4px; color: var(--text-muted); font-size: 11px; font-weight: 650; white-space: nowrap; }
 .workspace { display: grid; gap: 22px; }
 .controls { display: grid; grid-template-columns: 278px minmax(0, 1fr); gap: 14px; align-items: start; }
 .card { display: grid; gap: 13px; padding: 16px; background: var(--surface); border: 1px solid var(--border); border-radius: 7px; }
@@ -13,7 +14,7 @@
 .collectionActions { display: flex; flex-direction: column; gap: 8px; }
 .sampleCollection { text-align: center !important; background: var(--surface-raised) !important; border-color: #3b82f6 !important; color: #93c5fd !important; }
 .sampleCollection:hover:not(:disabled) { background: #1e3a8a !important; color: #ffffff !important; }
-.sampleDownloadRow { display: flex; justify-content: flex-end; margin-top: -4px; }
+.sampleDownloadRow { display: flex; justify-content: flex-end; gap: 12px; margin-top: -4px; }
 .sampleDownloadLink { color: var(--text-muted); font-size: 11px; text-decoration: underline; transition: color .15s; }
 .sampleDownloadLink:hover { color: #90d1ff; }
 .clearCollection { text-align: center !important; }
@@ -74,9 +75,13 @@
 .chipRemove:hover { background: #513037 !important; color: #ff9aa3 !important; }
 
 @media (max-width: 800px) {
-	.shell { padding: 18px 16px 36px; }
-	.hero { align-items: flex-start; }
-	.logo { width: 200px; }
+	.shell { padding: 18px 16px 36px; overflow-x: hidden; }
+	.hero { grid-template-columns: 1fr; justify-items: center; align-items: flex-start; }
+	.brand { flex-direction: column; gap: 8px; max-width: 100%; }
+	.brandText { justify-self: center; white-space: normal; }
+	.collectionStatus { white-space: normal; text-align: center; }
+	.heroSpacer { display: none; }
+	.logo { width: 200px; max-width: 100%; }
 	.controls { grid-template-columns: 1fr; }
 	.filterOptions { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 	.results { grid-template-columns: 1fr; }

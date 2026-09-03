@@ -13,7 +13,7 @@ from models.collection import Collection
 NAME_HEADERS = ("Name", "Card Name")
 QUANTITY_HEADERS = ("Count", "Quantity")
 TEXT_COLLECTION_LINE = re.compile(
-    r"^\s*(?P<quantity>\d+)\s+(?P<name>.+)\s+\([^)]+\)\s+\S+(?:\s+\*F\*)?\s*$"
+    r"^\s*(?P<quantity>\d+)\s+(?P<name>.+?)(?:\s+\([^)]+\)\s+\S+)?(?:\s+\*F\*)?\s*$"
 )
 
 
@@ -83,7 +83,7 @@ def parse_moxfield_csv(path_or_fileobj) -> dict[str, int]:
 
 
 def parse_plaintext_collection(fileobj) -> dict[str, int]:
-    """Parse ``quantity card name (set) collector-number`` collection lines."""
+    """Parse ``quantity card name`` lines; trailing ``(set) collector-number`` and ``*F*`` are optional."""
     collection: dict[str, int] = defaultdict(int)
 
     for line in fileobj:

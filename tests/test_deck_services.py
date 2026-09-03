@@ -103,6 +103,15 @@ def test_parse_plaintext_collection_ignores_print_details_and_foil_markers():
     }
 
 
+def test_parse_plaintext_collection_allows_bare_quantity_and_name():
+    export = io.StringIO("1 Sol Ring\n2 Arcane Signet\n")
+
+    assert parse_plaintext_collection(export) == {
+        "sol ring": 1,
+        "arcane signet": 2,
+    }
+
+
 def test_search_decks_applies_filters_and_rejects_invalid_limit():
     decks = [
         make_deck("Boros", {"a"}, "R"),

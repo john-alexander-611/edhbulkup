@@ -375,9 +375,10 @@ export default function HomePage() {
             height={180}
             priority
           />
-          <p className={styles.brandText}>Find Decks Hidden in Your Bulk</p>
+          <p className={styles.collectionStatus}>{file ? "Collection loaded" : "No collection loaded"}</p>
         </div>
-        <p className={styles.collectionStatus}>{file ? "Collection loaded" : "No collection loaded"}</p>
+        <p className={styles.brandText}>Find Decks Hidden in Your Bulk</p>
+        <div className={styles.heroSpacer} aria-hidden="true" />
       </header>
       <section className={styles.workspace}>
         <aside className={styles.controls}>
@@ -399,6 +400,9 @@ export default function HomePage() {
             <div className={styles.sampleDownloadRow}>
               <a href="/sample_collection.csv" download="sample_collection.csv" className={styles.sampleDownloadLink}>
                 Download sample CSV
+              </a>
+              <a href="/sample_collection.txt" download="sample_collection.txt" className={styles.sampleDownloadLink}>
+                Download sample TXT
               </a>
             </div>
             <p className={styles.hint}>{message}</p>

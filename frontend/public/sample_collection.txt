@@ -1,0 +1,11 @@
+1 Sol Ring (CMD) 123
+1 Arcane Signet (CLB) 331
+1 Command Tower (CMR) 332
+2 Lightning Bolt (2XM) 117
+1 Swords to Plowshares (STA) 23
+1 Rhystic Study (PZ2) 3
+1 Cyclonic Rift (SLD) 456 *F*
+1 Sensei's Divining Top (M3C) 234
+1 Counterspell
+1 Arcane Denial
+1 Path to Exile

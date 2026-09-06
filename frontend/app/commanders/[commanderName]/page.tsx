@@ -40,6 +40,26 @@ function groupDecklist(cards: DecklistCard[], commanderName: string) {
   }, {});
 }
 
+type DecklistTypeGroup = { type: string; cards: DecklistCard[] };
+
+// Split into two fixed columns ourselves instead of relying on CSS multi-column balancing,
+// which reflows (and jumps cards between columns) whenever a hover preview changes layout.
+function splitDecklistColumns(cards: DecklistCard[], commanderName: string): DecklistTypeGroup[][] {
+  const grouped = groupDecklist(cards, commanderName);
+  const groups = decklistTypeOrder
+    .map((type) => ({ type, cards: grouped[type] }))
+    .filter((group): group is DecklistTypeGroup => Boolean(group.cards?.length));
+
+  const columns: DecklistTypeGroup[][] = [[], []];
+  const columnLines = [0, 0];
+  for (const group of groups) {
+    const targetColumn = columnLines[0] <= columnLines[1] ? 0 : 1;
+    columns[targetColumn].push(group);
+    columnLines[targetColumn] += group.cards.length + 1;
+  }
+  return columns;
+}
+
 type BudgetLimit = "any" | "five" | "one";
 
 const budgetLimits: Record<BudgetLimit, number | null> = {
@@ -99,15 +119,17 @@ export default function CommanderPage() {
     <section>
       <h2>Average Decklist</h2>
       <div className={styles.decklist}>
-        {decklistTypeOrder.map((type) => {
-          const cards = groupDecklist(analysis.average_decklist ?? [], analysis.commander_name)[type];
-          if (!cards?.length) return null;
-          const total = cards.reduce((sum, card) => sum + card.quantity, 0);
-          return <div className={styles.decklistGroup} key={type}>
-            <h3>{formatTagLabel(type)} ({total})</h3>
-            <ul>{cards.map((card) => <DecklistCard card={card} key={card.name} />)}</ul>
-          </div>;
-        })}
+        {splitDecklistColumns(analysis.average_decklist ?? [], analysis.commander_name).map((groups, index) => (
+          <div className={styles.decklistColumn} key={index}>
+            {groups.map(({ type, cards }) => {
+              const total = cards.reduce((sum, card) => sum + card.quantity, 0);
+              return <div className={styles.decklistGroup} key={type}>
+                <h3>{formatTagLabel(type)} ({total})</h3>
+                <ul>{cards.map((card) => <DecklistCard card={card} key={card.name} />)}</ul>
+              </div>;
+            })}
+          </div>
+        ))}
       </div>
     </section>
     <section>

@@ -63,6 +63,8 @@ class DeckAnalysisResponse(BaseModel):
     same_type_replacements: dict[str, list[str]] = {}
     warnings: list[str] = []
     image_url: str | None = None
+    usd_price: float | None = None
+    tcgplayer_id: int | None = None
 
 
 class UploadCollectionResponse(BaseModel):

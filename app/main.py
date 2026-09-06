@@ -300,6 +300,7 @@ async def commander_analysis(commander_name: str):
                 name=card_name,
                 display_name=card_meta["display_name"],
                 image_url=card_meta["image_url"],
+                usd_price=card_meta.get("usd_price"),
                 tcgplayer_id=card_meta.get("tcgplayer_id"),
                 quantity=quantity,
                 owned_quantity=min(collection.quantity(card_name), quantity),
@@ -364,6 +365,8 @@ async def commander_analysis(commander_name: str):
         },
         warnings=list(analysis.warnings),
         image_url=commander_meta["image_url"],
+        usd_price=commander_meta.get("usd_price"),
+        tcgplayer_id=commander_meta.get("tcgplayer_id"),
     )
 
 

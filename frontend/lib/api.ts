@@ -19,6 +19,7 @@ export type DeckAnalysis = {
   missing_card_details: CardPresentation[]; average_decklist: DecklistCard[]; missing_by_tag: Record<string, string[]>;
   replacements_by_tag: ReplacementGroup[]; owned_synergy_cards: string[];
   same_type_replacements: Record<string, string[]>; warnings: string[]; image_url: string | null;
+  usd_price: number | null; tcgplayer_id: number | null;
 };
 export type SearchFilters = {
   name?: string;

@@ -11,9 +11,10 @@
 .headerText { flex: 1; }
 .headerText > p:last-child { margin: 0; color: var(--text-muted); font-size: 14px; }
 .commanderImage { width: 156px; aspect-ratio: .72; object-fit: cover; border: 1px solid var(--border-strong); border-radius: 5px; background: var(--surface-input); box-shadow: 0 10px 20px rgba(0, 0, 0, .35); }
-.commanderImageLink { position: relative; display: inline-block; }
+.commanderImageLink, .commanderImageButton { position: relative; display: inline-block; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; }
 .commanderImagePreview { display: none; position: absolute; z-index: 3; top: 50%; left: calc(100% + 16px); width: 380px; aspect-ratio: .72; object-fit: cover; border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 16px 36px rgba(0, 0, 0, .6); transform: translateY(-50%); }
-.commanderImageLink:hover .commanderImagePreview, .commanderImageLink:focus-visible .commanderImagePreview { display: block; }
+.commanderImageLink:hover .commanderImagePreview, .commanderImageLink:focus-visible .commanderImagePreview,
+.commanderImageButton:hover .commanderImagePreview, .commanderImageButton:focus-visible .commanderImagePreview { display: block; }
 .page section { margin-top: 34px; }
 .page section > h2 { margin: 0 0 12px; padding-bottom: 9px; border-bottom: 1px solid var(--border); font-family: Georgia, serif; font-size: 22px; font-weight: 500; }
 .replacementHeader { display: flex; align-items: center; justify-content: flex-start; gap: 28px; margin-bottom: 12px; padding-bottom: 9px; border-bottom: 1px solid var(--border); }
@@ -42,9 +43,9 @@
 .missingList li > strong { min-width: 19px; color: var(--danger); font-size: 11px; text-align: right; }
 .missingList .cardLink { display: inline; }
 .missingList li:nth-child(4n + 1), .missingList li:nth-child(4n + 4) { background: rgba(255, 255, 255, .025); }
-.cardLink { position: relative; display: inline-block; color: #dce0e5; font-size: 13px; line-height: 1.5; text-decoration: none; }
-.cardLink:hover, .cardLink:focus-visible { color: var(--accent); text-decoration: underline; }
-.cardLink:hover .cardPreview, .cardLink:focus-visible .cardPreview { display: block; }
+.cardLink, .cardButton { position: relative; display: inline-block; background: none; border: 0; padding: 0; margin: 0; color: #dce0e5; font: inherit; font-size: 13px; line-height: 1.5; text-align: left; cursor: pointer; text-decoration: none; }
+.cardLink:hover, .cardLink:focus-visible, .cardButton:hover, .cardButton:focus-visible { color: var(--accent); text-decoration: underline; }
+.cardLink:hover .cardPreview, .cardLink:focus-visible .cardPreview, .cardButton:hover .cardPreview, .cardButton:focus-visible .cardPreview { display: block; }
 .moreSuggestions { margin-top: 12px; padding: 7px 10px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface-raised); color: var(--accent); cursor: pointer; font: inherit; font-size: 12px; font-weight: 650; }
 .moreSuggestions:hover, .moreSuggestions:focus-visible { border-color: var(--accent); background: #30343a; }
 .missingCard { border-color: var(--danger); background: #3c2026; }
@@ -59,12 +60,290 @@
 .decklistCard > strong { min-width: 19px; color: var(--text-muted); font-size: 11px; text-align: right; }
 .decklistCard.missingCard { background: transparent; border: 0; color: #ffb0b4; }
 .decklistCard.missingCard > strong { color: var(--danger); }
-.decklistLink { position: relative; display: inline-block; color: inherit; text-decoration: none; }
-.decklistLink:hover { color: var(--accent); text-decoration: underline; }
-.decklistCard.missingCard .decklistLink { color: #ffb0b4; }
-.decklistCard.missingCard .decklistLink:hover { color: #ffd1d3; }
+.decklistLink, .decklistButton { position: relative; display: inline-block; background: none; border: 0; padding: 0; margin: 0; color: inherit; font: inherit; font-size: inherit; text-align: left; cursor: pointer; text-decoration: none; }
+.decklistLink:hover, .decklistLink:focus-visible, .decklistButton:hover, .decklistButton:focus-visible { color: var(--accent); text-decoration: underline; }
+.decklistCard.missingCard .decklistLink, .decklistCard.missingCard .decklistButton { color: #ffb0b4; }
+.decklistCard.missingCard .decklistLink:hover, .decklistCard.missingCard .decklistButton:hover { color: #ffd1d3; }
 .cardPreview { display: none; position: absolute; z-index: 2; top: 50%; left: calc(100% + 8px); width: 240px; aspect-ratio: .72; object-fit: cover; border: 1px solid var(--border-strong); border-radius: 5px; box-shadow: 0 12px 28px rgba(0, 0, 0, .5); transform: translateY(-50%); }
-.decklistLink:hover .cardPreview, .decklistLink:focus-visible .cardPreview { display: block; }
+.decklistLink:hover .cardPreview, .decklistLink:focus-visible .cardPreview, .decklistButton:hover .cardPreview, .decklistButton:focus-visible .cardPreview { display: block; }
+
+/* Lightbox Modal */
+.lightboxOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(4, 8, 14, 0.84);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  animation: lightboxBackdropIn 0.2s ease-out;
+}
+
+@keyframes lightboxBackdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.lightboxStage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  max-width: 100%;
+}
+
+.lightboxContainer {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  max-width: 420px;
+  width: 100%;
+  max-height: 90vh;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7);
+  padding: 24px 20px 20px;
+  animation: lightboxModalIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+@keyframes lightboxModalIn {
+  from { opacity: 0; transform: scale(0.95) translateY(10px); }
+  to { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.lightboxClose {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.lightboxClose:hover, .lightboxClose:focus-visible {
+  background: var(--border-strong);
+  color: #fff;
+  transform: scale(1.06);
+}
+
+.lightboxNav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  color: #fff;
+  cursor: pointer;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.6);
+  transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+
+.lightboxNav:hover:not(:disabled), .lightboxNav:focus-visible:not(:disabled) {
+  background: var(--surface-raised);
+  border-color: var(--accent);
+  color: var(--accent);
+  transform: scale(1.08);
+}
+
+.lightboxNav:disabled {
+  opacity: 0.25;
+  cursor: not-allowed;
+}
+
+.lightboxCardWrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+}
+
+.lightboxImageWrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  max-width: 320px;
+  aspect-ratio: 0.714;
+  background: var(--surface-input);
+  border-radius: 10px;
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+
+.lightboxImage {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.lightboxImagePlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  font-size: 14px;
+  text-align: center;
+  padding: 20px;
+}
+
+.lightboxDetails {
+  width: 100%;
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.lightboxTitle {
+  margin: 0 0 4px;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+}
+
+.lightboxCardName {
+  margin: 0 0 8px;
+  font-family: Georgia, serif;
+  font-size: 20px;
+  font-weight: 600;
+  color: #fff;
+  line-height: 1.25;
+}
+
+.lightboxMetaRow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.lightboxPriceBadge {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 4px 10px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.lightboxPriceLabel {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.lightboxPriceValue {
+  font-size: 14px;
+  font-weight: 750;
+  color: #79c9ff;
+}
+
+.lightboxPriceMuted {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.lightboxCounter {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.lightboxBuyButton {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  padding: 13px 20px;
+  background: linear-gradient(180deg, #79c9ff, var(--accent-strong));
+  border: 1px solid #9fd8ff;
+  border-radius: 7px;
+  color: #04121c;
+  font-size: 14px;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  text-decoration: none;
+  box-shadow: 0 4px 16px rgba(91, 184, 255, 0.35);
+  transition: all 0.15s ease;
+}
+
+.lightboxBuyButton:hover, .lightboxBuyButton:focus-visible {
+  filter: brightness(1.1);
+  box-shadow: 0 6px 22px rgba(91, 184, 255, 0.5);
+  transform: translateY(-1px);
+}
+
+.lightboxMobileNav {
+  display: none;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.lightboxMobileNavBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--surface-raised);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.lightboxMobileNavBtn:hover:not(:disabled), .lightboxMobileNavBtn:focus-visible:not(:disabled) {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.lightboxMobileNavBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.lightboxMobileCounter {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
 
 @media (max-width: 720px) {
 	.page { padding: 18px 16px 40px; }
@@ -77,6 +356,10 @@
 	.missingList { grid-template-columns: 1fr; }
 	.cardList { grid-template-columns: 1fr; }
 	.replacementHeader { flex-direction: column; gap: 12px; }
-	.cardPreview { top: 100%; right: 0; left: auto; transform: none; }
-	.commanderImagePreview { top: 100%; left: 0; width: 260px; transform: none; }
+	.cardPreview { display: none !important; }
+	.commanderImagePreview { display: none !important; }
+	.lightboxNav { display: none; }
+	.lightboxMobileNav { display: flex; }
+	.lightboxContainer { padding: 20px 16px 16px; max-width: 100%; border-radius: 10px; }
+	.lightboxImageWrapper { max-width: 270px; }
 }

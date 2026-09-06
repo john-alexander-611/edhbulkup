@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams } from "next/navigation";
 import { getCommanderAnalysis, type CardPresentation, type DeckAnalysis, type DecklistCard } from "@/lib/api";
 import { tcgplayerCardUrl, tcgplayerMassEntryUrl } from "@/lib/tcgplayer";
@@ -68,12 +68,19 @@ const budgetLimits: Record<BudgetLimit, number | null> = {
   one: 1,
 };
 
+type LightboxState = {
+  cards: CardPresentation[];
+  index: number;
+  title?: string;
+};
+
 export default function CommanderPage() {
   const params = useParams<{ commanderName?: string | string[] }>();
   const [analysis, setAnalysis] = useState<DeckAnalysis | null>(null);
   const [error, setError] = useState("");
   const [expandedSuggestionGroups, setExpandedSuggestionGroups] = useState<Record<string, boolean>>({});
   const [budgetLimit, setBudgetLimit] = useState<BudgetLimit>("any");
+  const [lightbox, setLightbox] = useState<LightboxState | null>(null);
 
   const commanderName = Array.isArray(params.commanderName)
     ? params.commanderName[0]
@@ -97,6 +104,14 @@ export default function CommanderPage() {
     quantity: analysis.average_decklist.find((deckCard) => deckCard.name === card.name)?.quantity ?? 1,
   }));
 
+  const commanderCard: CardPresentation = {
+    name: analysis.commander_name,
+    display_name: analysis.commander_name,
+    image_url: analysis.image_url,
+    usd_price: analysis.usd_price ?? analysis.average_decklist.find((deckCard) => deckCard.name.toLowerCase() === analysis.commander_name.toLowerCase())?.usd_price ?? null,
+    tcgplayer_id: analysis.tcgplayer_id ?? analysis.average_decklist.find((deckCard) => deckCard.name.toLowerCase() === analysis.commander_name.toLowerCase())?.tcgplayer_id ?? null,
+  };
+
   return <main className={styles.page}>
     <header className={styles.appHeader}>
       <Link className={styles.appBrand} href="/">
@@ -106,10 +121,15 @@ export default function CommanderPage() {
       <Link className={styles.backLink} href="/">Back to search</Link>
     </header>
     <header className={styles.header}>
-      {analysis.image_url ? <a className={styles.commanderImageLink} href={tcgplayerCardUrl({ name: analysis.commander_name })} target="_blank" rel="noreferrer">
+      {analysis.image_url ? <button
+        type="button"
+        className={styles.commanderImageButton}
+        onClick={() => setLightbox({ cards: [commanderCard], index: 0, title: "Commander" })}
+        aria-label={`View ${analysis.commander_name}`}
+      >
         <img className={styles.commanderImage} src={analysis.image_url} alt={analysis.commander_name} />
         <img className={styles.commanderImagePreview} src={analysis.image_url} alt="" />
-      </a> : null}
+      </button> : null}
       <div className={styles.headerText}>
         <p className={styles.eyebrow}>{analysis.identity} COMMANDER</p>
         <h1>{analysis.commander_name}</h1>
@@ -123,9 +143,16 @@ export default function CommanderPage() {
           <div className={styles.decklistColumn} key={index}>
             {groups.map(({ type, cards }) => {
               const total = cards.reduce((sum, card) => sum + card.quantity, 0);
+              const groupTitle = `Decklist · ${formatTagLabel(type)}`;
               return <div className={styles.decklistGroup} key={type}>
                 <h3>{formatTagLabel(type)} ({total})</h3>
-                <ul>{cards.map((card) => <DecklistCard card={card} key={card.name} />)}</ul>
+                <ul>{cards.map((card, cardIndex) => (
+                  <DecklistCard
+                    card={card}
+                    key={card.name}
+                    onSelect={() => setLightbox({ cards, index: cardIndex, title: groupTitle })}
+                  />
+                ))}</ul>
               </div>;
             })}
           </div>
@@ -137,7 +164,15 @@ export default function CommanderPage() {
         <h2>Missing cards</h2>
         {missingCards.length ? <a className={styles.buyButton} href={tcgplayerMassEntryUrl(missingCards)} target="_blank" rel="noreferrer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" /></svg>Buy all on TCGplayer</a> : null}
       </div>
-      <ul className={styles.missingList}>{analysis.missing_card_details.map((card) => <li key={card.name}><strong>{analysis.average_decklist.find((deckCard) => deckCard.name === card.name)?.quantity ?? 1}</strong><Card card={card} /></li>)}</ul>
+      <ul className={styles.missingList}>{analysis.missing_card_details.map((card, cardIndex) => (
+        <li key={card.name}>
+          <strong>{analysis.average_decklist.find((deckCard) => deckCard.name === card.name)?.quantity ?? 1}</strong>
+          <Card
+            card={card}
+            onSelect={() => setLightbox({ cards: analysis.missing_card_details, index: cardIndex, title: "Missing Cards" })}
+          />
+        </li>
+      ))}</ul>
     </section>
     <section>
       <div className={styles.replacementHeader}>
@@ -159,30 +194,280 @@ export default function CommanderPage() {
       const hasMoreSuggestions = budgetedReplacements.length > 10 && !isExpanded;
 
       return <article className={styles.group} key={group.tag}><h3>Category: {formatTagLabel(group.tag)}</h3>
-        <div className={styles.subsection}><h4 className={styles.missingHeading}>Missing Cards</h4>{group.missing_card_details?.length ? <CardList cards={group.missing_card_details} /> : <p>Missing: {group.missing_cards.join(", ") || "None"}</p>}</div>
-        <div className={styles.subsection}><h4 className={styles.replacementHeading}>Suggested Replacements</h4>{visibleReplacements.length ? <CardList cards={visibleReplacements} /> : <p>No suggestions meet this budget.</p>}{hasMoreSuggestions ? <button className={styles.moreSuggestions} type="button" onClick={() => setExpandedSuggestionGroups((groups) => ({ ...groups, [group.tag]: true }))}>More suggestions</button> : null}</div>
+        <div className={styles.subsection}>
+          <h4 className={styles.missingHeading}>Missing Cards</h4>
+          {group.missing_card_details?.length ? (
+            <CardList
+              cards={group.missing_card_details}
+              onSelect={(idx) => setLightbox({ cards: group.missing_card_details, index: idx, title: `Missing · ${formatTagLabel(group.tag)}` })}
+            />
+          ) : (
+            <p>Missing: {group.missing_cards.join(", ") || "None"}</p>
+          )}
+        </div>
+        <div className={styles.subsection}>
+          <h4 className={styles.replacementHeading}>Suggested Replacements</h4>
+          {visibleReplacements.length ? (
+            <CardList
+              cards={visibleReplacements}
+              onSelect={(idx) => setLightbox({ cards: visibleReplacements, index: idx, title: `Suggested Replacements · ${formatTagLabel(group.tag)}` })}
+            />
+          ) : (
+            <p>No suggestions meet this budget.</p>
+          )}
+          {hasMoreSuggestions ? (
+            <button
+              className={styles.moreSuggestions}
+              type="button"
+              onClick={() => setExpandedSuggestionGroups((groups) => ({ ...groups, [group.tag]: true }))}
+            >
+              More suggestions
+            </button>
+          ) : null}
+        </div>
       </article>;
     })}</section>
+
+    {lightbox && (
+      <Lightbox
+        state={lightbox}
+        onClose={() => setLightbox(null)}
+        onNavigate={(newIndex) => setLightbox((curr) => curr ? { ...curr, index: newIndex } : null)}
+      />
+    )}
   </main>;
 }
 
-function Card({ card }: { card: CardPresentation }) {
-  return <a className={styles.cardLink} href={tcgplayerCardUrl(card)} target="_blank" rel="noreferrer">
+function Card({ card, onSelect }: { card: CardPresentation; onSelect?: () => void }) {
+  return <button type="button" className={styles.cardButton} onClick={onSelect}>
     <span>{card.display_name || card.name}</span>
     {card.image_url ? <img className={styles.cardPreview} src={card.image_url} alt="" /> : null}
-  </a>;
+  </button>;
 }
 
-function CardList({ cards }: { cards: CardPresentation[] }) {
-  return <ul className={styles.cardList}>{cards.map((card) => <li key={card.name}><Card card={card} /></li>)}</ul>;
+function CardList({ cards, onSelect }: { cards: CardPresentation[]; onSelect?: (index: number) => void }) {
+  return <ul className={styles.cardList}>{cards.map((card, index) => (
+    <li key={card.name}><Card card={card} onSelect={() => onSelect?.(index)} /></li>
+  ))}</ul>;
 }
 
-function DecklistCard({ card }: { card: DecklistCard }) {
+function DecklistCard({ card, onSelect }: { card: DecklistCard; onSelect?: () => void }) {
   return <li className={`${styles.decklistCard} ${card.owned ? "" : styles.missingCard}`}>
     <strong>{card.owned_quantity}/{card.quantity}</strong>
-    <a className={styles.decklistLink} href={tcgplayerCardUrl(card)} target="_blank" rel="noreferrer">
+    <button type="button" className={styles.decklistButton} onClick={onSelect}>
       <span>{card.display_name || card.name}</span>
       {card.image_url ? <img className={styles.cardPreview} src={card.image_url} alt="" /> : null}
-    </a>
+    </button>
   </li>;
+}
+
+function Lightbox({
+  state,
+  onClose,
+  onNavigate,
+}: {
+  state: LightboxState;
+  onClose: () => void;
+  onNavigate: (index: number) => void;
+}) {
+  const { cards, index, title } = state;
+  const currentCard = cards[index];
+  const hasPrev = index > 0;
+  const hasNext = index < cards.length - 1;
+
+  const goToPrev = useCallback(() => {
+    if (hasPrev) onNavigate(index - 1);
+  }, [hasPrev, index, onNavigate]);
+
+  const goToNext = useCallback(() => {
+    if (hasNext) onNavigate(index + 1);
+  }, [hasNext, index, onNavigate]);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        onClose();
+      } else if (e.key === "ArrowLeft") {
+        goToPrev();
+      } else if (e.key === "ArrowRight") {
+        goToNext();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [goToPrev, goToNext, onClose]);
+
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, []);
+
+  const touchStartX = useRef<number | null>(null);
+  const touchStartY = useRef<number | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX.current = e.touches[0].clientX;
+    touchStartY.current = e.touches[0].clientY;
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX.current === null || touchStartY.current === null) return;
+    const deltaX = e.changedTouches[0].clientX - touchStartX.current;
+    const deltaY = e.changedTouches[0].clientY - touchStartY.current;
+    touchStartX.current = null;
+    touchStartY.current = null;
+
+    if (Math.abs(deltaX) > 40 && Math.abs(deltaX) > Math.abs(deltaY) * 1.2) {
+      if (deltaX < 0 && hasNext) {
+        goToNext();
+      } else if (deltaX > 0 && hasPrev) {
+        goToPrev();
+      }
+    }
+  };
+
+  if (!currentCard) return null;
+
+  return (
+    <div
+      className={styles.lightboxOverlay}
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+      aria-label={currentCard.display_name || currentCard.name}
+    >
+      <div className={styles.lightboxStage} onClick={(e) => e.stopPropagation()}>
+        {cards.length > 1 && (
+          <button
+            type="button"
+            className={`${styles.lightboxNav} ${styles.lightboxPrev}`}
+            onClick={goToPrev}
+            disabled={!hasPrev}
+            aria-label="Previous card"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+          </button>
+        )}
+
+        <div
+          className={styles.lightboxContainer}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
+        >
+          <button
+            type="button"
+            className={styles.lightboxClose}
+            onClick={onClose}
+            aria-label="Close card view"
+          >
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <line x1="18" y1="6" x2="6" y2="18" />
+              <line x1="6" y1="6" x2="18" y2="18" />
+            </svg>
+          </button>
+
+          <div className={styles.lightboxCardWrapper}>
+            <div className={styles.lightboxImageWrapper}>
+              {currentCard.image_url ? (
+                <img
+                  key={currentCard.name}
+                  className={styles.lightboxImage}
+                  src={currentCard.image_url}
+                  alt={currentCard.display_name || currentCard.name}
+                />
+              ) : (
+                <div className={styles.lightboxImagePlaceholder}>
+                  <span>No image available</span>
+                </div>
+              )}
+            </div>
+
+            <div className={styles.lightboxDetails}>
+              {title ? <p className={styles.lightboxTitle}>{title}</p> : null}
+              <h3 className={styles.lightboxCardName}>{currentCard.display_name || currentCard.name}</h3>
+
+              <div className={styles.lightboxMetaRow}>
+                {currentCard.usd_price !== null && currentCard.usd_price !== undefined ? (
+                  <div className={styles.lightboxPriceBadge}>
+                    <span className={styles.lightboxPriceLabel}>Est. Price</span>
+                    <span className={styles.lightboxPriceValue}>${currentCard.usd_price.toFixed(2)}</span>
+                  </div>
+                ) : (
+                  <div className={styles.lightboxPriceBadge}>
+                    <span className={styles.lightboxPriceLabel}>Est. Price</span>
+                    <span className={styles.lightboxPriceMuted}>N/A</span>
+                  </div>
+                )}
+
+                {cards.length > 1 && (
+                  <span className={styles.lightboxCounter}>
+                    {index + 1} of {cards.length}
+                  </span>
+                )}
+              </div>
+
+              <a
+                className={styles.lightboxBuyButton}
+                href={tcgplayerCardUrl(currentCard)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <circle cx="9" cy="21" r="1" />
+                  <circle cx="20" cy="21" r="1" />
+                  <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" />
+                </svg>
+                Buy this card on TCGplayer
+              </a>
+
+              {cards.length > 1 && (
+                <div className={styles.lightboxMobileNav}>
+                  <button
+                    type="button"
+                    className={styles.lightboxMobileNavBtn}
+                    onClick={goToPrev}
+                    disabled={!hasPrev}
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>
+                    Prev
+                  </button>
+                  <span className={styles.lightboxMobileCounter}>
+                    {index + 1} / {cards.length}
+                  </span>
+                  <button
+                    type="button"
+                    className={styles.lightboxMobileNavBtn}
+                    onClick={goToNext}
+                    disabled={!hasNext}
+                  >
+                    Next
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {cards.length > 1 && (
+          <button
+            type="button"
+            className={`${styles.lightboxNav} ${styles.lightboxNext}`}
+            onClick={goToNext}
+            disabled={!hasNext}
+            aria-label="Next card"
+          >
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
+          </button>
+        )}
+      </div>
+    </div>
+  );
 }

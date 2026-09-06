@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { getCommanderAnalysis, type CardPresentation, type DeckAnalysis, type DecklistCard } from "@/lib/api";
+import { tcgplayerCardUrl, tcgplayerMassEntryUrl } from "@/lib/tcgplayer";
 import styles from "./page.module.css";
 
 function formatTagLabel(tag: string) {
@@ -39,10 +40,6 @@ function groupDecklist(cards: DecklistCard[], commanderName: string) {
   }, {});
 }
 
-function scryfallCardUrl(cardName: string) {
-  return `https://scryfall.com/search?q=${encodeURIComponent(cardName)}`;
-}
-
 type BudgetLimit = "any" | "five" | "one";
 
 const budgetLimits: Record<BudgetLimit, number | null> = {
@@ -75,6 +72,11 @@ export default function CommanderPage() {
   if (error) return <main className={styles.page}><a href="/">Back to search</a><p>{error}</p></main>;
   if (!analysis) return <main className={styles.page}><a href="/">Back to search</a><p>Loading commander analysis...</p></main>;
 
+  const missingCards = analysis.missing_card_details.map((card) => ({
+    name: card.name,
+    quantity: analysis.average_decklist.find((deckCard) => deckCard.name === card.name)?.quantity ?? 1,
+  }));
+
   return <main className={styles.page}>
     <header className={styles.appHeader}>
       <Link className={styles.appBrand} href="/">
@@ -84,7 +86,7 @@ export default function CommanderPage() {
       <Link className={styles.backLink} href="/">Back to search</Link>
     </header>
     <header className={styles.header}>
-      {analysis.image_url ? <a className={styles.commanderImageLink} href={scryfallCardUrl(analysis.commander_name)} target="_blank" rel="noreferrer">
+      {analysis.image_url ? <a className={styles.commanderImageLink} href={tcgplayerCardUrl({ name: analysis.commander_name })} target="_blank" rel="noreferrer">
         <img className={styles.commanderImage} src={analysis.image_url} alt={analysis.commander_name} />
         <img className={styles.commanderImagePreview} src={analysis.image_url} alt="" />
       </a> : null}
@@ -108,7 +110,13 @@ export default function CommanderPage() {
         })}
       </div>
     </section>
-    <section><h2>Missing cards</h2><ul className={styles.missingList}>{analysis.missing_card_details.map((card) => <li key={card.name}><strong>{analysis.average_decklist.find((deckCard) => deckCard.name === card.name)?.quantity ?? 1}</strong><Card card={card} /></li>)}</ul></section>
+    <section>
+      <div className={styles.missingHeader}>
+        <h2>Missing cards</h2>
+        {missingCards.length ? <a className={styles.buyButton} href={tcgplayerMassEntryUrl(missingCards)} target="_blank" rel="noreferrer"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="9" cy="21" r="1" /><circle cx="20" cy="21" r="1" /><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6" /></svg>Buy all on TCGplayer</a> : null}
+      </div>
+      <ul className={styles.missingList}>{analysis.missing_card_details.map((card) => <li key={card.name}><strong>{analysis.average_decklist.find((deckCard) => deckCard.name === card.name)?.quantity ?? 1}</strong><Card card={card} /></li>)}</ul>
+    </section>
     <section>
       <div className={styles.replacementHeader}>
         <h2>Replacement Recommendations by Category</h2>
@@ -137,7 +145,7 @@ export default function CommanderPage() {
 }
 
 function Card({ card }: { card: CardPresentation }) {
-  return <a className={styles.cardLink} href={scryfallCardUrl(card.name)} target="_blank" rel="noreferrer">
+  return <a className={styles.cardLink} href={tcgplayerCardUrl(card)} target="_blank" rel="noreferrer">
     <span>{card.display_name || card.name}</span>
     {card.image_url ? <img className={styles.cardPreview} src={card.image_url} alt="" /> : null}
   </a>;
@@ -150,7 +158,7 @@ function CardList({ cards }: { cards: CardPresentation[] }) {
 function DecklistCard({ card }: { card: DecklistCard }) {
   return <li className={`${styles.decklistCard} ${card.owned ? "" : styles.missingCard}`}>
     <strong>{card.owned_quantity}/{card.quantity}</strong>
-    <a className={styles.decklistLink} href={scryfallCardUrl(card.name)} target="_blank" rel="noreferrer">
+    <a className={styles.decklistLink} href={tcgplayerCardUrl(card)} target="_blank" rel="noreferrer">
       <span>{card.display_name || card.name}</span>
       {card.image_url ? <img className={styles.cardPreview} src={card.image_url} alt="" /> : null}
     </a>

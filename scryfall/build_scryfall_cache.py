@@ -59,7 +59,8 @@ def init_db(conn: sqlite3.Connection):
             color_identity TEXT,
             display_name TEXT,
             image_url TEXT,
-            usd_price REAL
+            usd_price REAL,
+            tcgplayer_id INTEGER
         );
         CREATE INDEX idx_cards_oracle_id ON cards(oracle_id);
     """)
@@ -135,6 +136,7 @@ def add_split_card_aliases(card: dict, batch: list[tuple]) -> None:
         full_name,
         resolve_image_url(card),
         card.get("prices", {}).get("usd"),
+        card.get("tcgplayer_id"),
     ))
 
 
@@ -183,13 +185,14 @@ async def build_cache():
                 card.get("name") or name,
                 resolve_image_url(card),
                 card.get("prices", {}).get("usd"),
+                card.get("tcgplayer_id"),
             ))
             add_split_card_aliases(card, batch)
             count += 1
 
             if len(batch) >= BATCH_SIZE:
                 conn.executemany(
-                    "INSERT OR REPLACE INTO cards (name, oracle_id, type_line, cmc, mana_cost, color_identity, display_name, image_url, usd_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    "INSERT OR REPLACE INTO cards (name, oracle_id, type_line, cmc, mana_cost, color_identity, display_name, image_url, usd_price, tcgplayer_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     batch,
                 )
                 conn.commit()
@@ -216,7 +219,7 @@ async def build_cache():
 
         if batch:
             conn.executemany(
-                "INSERT OR REPLACE INTO cards (name, oracle_id, type_line, cmc, mana_cost, color_identity, display_name, image_url, usd_price) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT OR REPLACE INTO cards (name, oracle_id, type_line, cmc, mana_cost, color_identity, display_name, image_url, usd_price, tcgplayer_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 batch,
             )
             conn.commit()

@@ -13,6 +13,7 @@ class FakeScryfallCache:
             "display_name": card_name.title(),
             "image_url": f"https://example.com/{card_name.lower()}.jpg",
             "usd_price": None,
+            "tcgplayer_id": None,
         }
 
     def close(self):

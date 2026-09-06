@@ -1,13 +1,17 @@
 from __future__ import annotations
 
+import asyncio
 import io
+import logging
 import os
+from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 import httpx
 from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
+from download_caches import ensure_caches, get_latest_release_id
 from app.schemas import (
     CardPresentationResponse,
     DeckAnalysisResponse,
@@ -34,6 +38,51 @@ from parse_input.parse_moxfield import parse_moxfield_csv, parse_plaintext_colle
 from services.deck_service import add_recommendations, analyze_deck, count_deck_matches, search_decks
 from scryfall.cache_wrappers import ScryfallCache, TagCache
 
+logger = logging.getLogger(__name__)
+
+
+def cache_auto_refresh_enabled() -> bool:
+    """Return whether this backend should synchronize published cache releases."""
+    return os.getenv("CACHE_AUTO_REFRESH", "false").lower() in {"1", "true", "yes"}
+
+
+def cache_refresh_interval_seconds() -> int:
+    """Return the release polling interval, defaulting to three hours."""
+    return max(60, int(os.getenv("CACHE_REFRESH_INTERVAL_SECONDS", "10800")))
+
+
+async def refresh_caches_when_release_changes(release_id: int) -> None:
+    """Poll GitHub and replace local cache files after a new release is published."""
+    while True:
+        await asyncio.sleep(cache_refresh_interval_seconds())
+        try:
+            latest_release_id = await asyncio.to_thread(get_latest_release_id)
+            if latest_release_id != release_id:
+                release_id = await asyncio.to_thread(ensure_caches, force=True)
+                logger.info("Refreshed local caches from GitHub release %s", release_id)
+        except Exception:
+            logger.exception("Unable to refresh caches; keeping the current local caches")
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    """Optionally synchronize cache assets during the backend lifecycle."""
+    refresh_task = None
+    if cache_auto_refresh_enabled():
+        try:
+            release_id = await asyncio.to_thread(ensure_caches, force=True)
+            logger.info("Loaded local caches from GitHub release %s", release_id)
+            refresh_task = asyncio.create_task(refresh_caches_when_release_changes(release_id))
+        except Exception:
+            logger.exception("Unable to load current caches at startup; using local caches")
+    try:
+        yield
+    finally:
+        if refresh_task:
+            refresh_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await refresh_task
+
 def get_allowed_origins() -> list[str]:
     """CORS-allowed origins from CORS_ALLOWED_ORIGINS env var, or a localhost dev default."""
     configured = os.getenv("CORS_ALLOWED_ORIGINS", "")
@@ -53,7 +102,7 @@ def get_allowed_origins() -> list[str]:
     ]
 
 
-app = FastAPI(title="EDH Bulk Up", version="0.1.0")
+app = FastAPI(title="EDH Bulk Up", version="0.1.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_allowed_origins(),
@@ -317,18 +366,46 @@ async def commander_analysis(commander_name: str):
 
 @app.post("/api/collection/upload", response_model=UploadCollectionResponse)
 def upload_collection(file: UploadFile = File(...)):
-    """Parse an uploaded collection file (.txt plaintext or Moxfield CSV) and store it in app state."""
+    """Parse an uploaded collection file (.txt plaintext or Moxfield CSV) and store it in app state.
+
+    Raises:
+        HTTPException: 400 if the file is empty, not valid UTF-8 text, or has no
+            parseable card rows/lines.
+    """
     content = file.file.read()
-    decoded_content = content.decode("utf-8-sig")
-    if Path(file.filename or "").suffix.lower() == ".txt":
-        parsed = parse_plaintext_collection(io.StringIO(decoded_content))
-    else:
-        parsed = parse_moxfield_csv(io.StringIO(decoded_content))
+    if not content:
+        raise HTTPException(status_code=400, detail=f"'{file.filename}' is empty. Upload a non-empty CSV or TXT file.")
+
+    try:
+        decoded_content = content.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        raise HTTPException(
+            status_code=400,
+            detail=f"'{file.filename}' isn't a valid text file. Export it as UTF-8 CSV or TXT and try again.",
+        )
+
+    skipped: list[str] = []
+    try:
+        if Path(file.filename or "").suffix.lower() == ".txt":
+            parsed = parse_plaintext_collection(io.StringIO(decoded_content), skipped=skipped)
+        else:
+            parsed = parse_moxfield_csv(io.StringIO(decoded_content), skipped=skipped)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"'{file.filename}': {exc}")
+
+    warnings = []
+    if skipped:
+        examples = "; ".join(skipped[:5])
+        warnings.append(
+            f"{len(skipped)} row(s) couldn't be read and were skipped (e.g. {examples})."
+        )
+
     collection = Collection(parsed)
     app.state.collection = collection
     return UploadCollectionResponse(
         owned_count=len(collection.names),
         sample_cards=sorted(collection.names)[:10],
+        warnings=warnings,
     )
     
 @app.post("/api/collection/clear")

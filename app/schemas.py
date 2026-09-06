@@ -68,3 +68,4 @@ class UploadCollectionResponse(BaseModel):
     """Result of parsing an uploaded collection file."""
 
     owned_count: int
+    warnings: list[str] = []

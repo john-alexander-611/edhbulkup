@@ -154,6 +154,7 @@ def build_card_details(cards: list[str] | tuple[str, ...], lookup):
             display_name=card_meta_lookup[card_name]["display_name"],
             image_url=card_meta_lookup[card_name]["image_url"],
             usd_price=card_meta_lookup[card_name].get("usd_price"),
+            tcgplayer_id=card_meta_lookup[card_name].get("tcgplayer_id"),
         )
         for card_name in card_names
         if card_name in card_meta_lookup and card_meta_lookup[card_name] is not None
@@ -299,6 +300,7 @@ async def commander_analysis(commander_name: str):
                 name=card_name,
                 display_name=card_meta["display_name"],
                 image_url=card_meta["image_url"],
+                tcgplayer_id=card_meta.get("tcgplayer_id"),
                 quantity=quantity,
                 owned_quantity=min(collection.quantity(card_name), quantity),
                 owned=collection.quantity(card_name) >= quantity,
@@ -325,6 +327,7 @@ async def commander_analysis(commander_name: str):
                     display_name=card_meta["display_name"],
                     image_url=card_meta["image_url"],
                     usd_price=card_meta["usd_price"],
+                    tcgplayer_id=card_meta.get("tcgplayer_id"),
                 )
                 for card_name in group.replacements
                 for card_meta in [scryfall_cache.get_card_display(card_name)]

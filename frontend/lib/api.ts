@@ -2,7 +2,7 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8
 
 export const apiBaseUrl = API_BASE_URL.replace(/\/$/, "");
 
-export type CardPresentation = { name: string; display_name: string; image_url: string | null; usd_price: number | null };
+export type CardPresentation = { name: string; display_name: string; image_url: string | null; usd_price: number | null; tcgplayer_id: number | null };
 export type DecklistCard = CardPresentation & { quantity: number; owned_quantity: number; owned: boolean; card_type: string };
 export type DeckMatch = { commander_name: string; identity: string; match_score: number; match_percentage: number; owned_count: number; deck_size: number; image_url: string | null };
 export type SearchResults = { results: DeckMatch[]; total: number };

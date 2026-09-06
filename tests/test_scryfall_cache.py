@@ -19,8 +19,8 @@ def test_scryfall_cache_adds_display_name_and_image_url_for_legacy_schema(tmp_pa
 
     cache = ScryfallCache(str(db_path))
     cache.conn.execute(
-        "UPDATE cards SET display_name = ?, image_url = ?, usd_price = ? WHERE name = ?",
-        ("Lightning Bolt", "https://example.com/lightning-bolt.jpg", 1.25, "lightning bolt"),
+        "UPDATE cards SET display_name = ?, image_url = ?, usd_price = ?, tcgplayer_id = ? WHERE name = ?",
+        ("Lightning Bolt", "https://example.com/lightning-bolt.jpg", 1.25, 12345, "lightning bolt"),
     )
     cache.conn.commit()
 
@@ -32,12 +32,14 @@ def test_scryfall_cache_adds_display_name_and_image_url_for_legacy_schema(tmp_pa
         "display_name": "Lightning Bolt",
         "image_url": "https://example.com/lightning-bolt.jpg",
         "usd_price": 1.25,
+        "tcgplayer_id": 12345,
     }
     assert cache.get_card_display("darkbore pathway") == {
         "name": "darkbore pathway",
         "display_name": "Darkbore Pathway",
         "image_url": None,
         "usd_price": None,
+        "tcgplayer_id": None,
     }
     assert cache.get_many_card_displays(["Lightning Bolt", "darkbore pathway"]) == {
         "lightning bolt": {
@@ -45,12 +47,14 @@ def test_scryfall_cache_adds_display_name_and_image_url_for_legacy_schema(tmp_pa
             "display_name": "Lightning Bolt",
             "image_url": "https://example.com/lightning-bolt.jpg",
             "usd_price": 1.25,
+            "tcgplayer_id": 12345,
         },
         "darkbore pathway": {
             "name": "darkbore pathway",
             "display_name": "Darkbore Pathway",
             "image_url": None,
             "usd_price": None,
+            "tcgplayer_id": None,
         },
     }
 
@@ -69,6 +73,7 @@ def test_scryfall_cache_adds_display_name_and_image_url_for_legacy_schema(tmp_pa
         "display_name": "Darkbore Pathway // Slitherbore Pathway",
         "image_url": "https://scryfall.com/card/khm/254/darkbore-pathway-slitherbore-pathway",
         "usd_price": None,
+        "tcgplayer_id": None,
     }
 
     cache.close()

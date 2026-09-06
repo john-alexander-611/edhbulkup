@@ -48,12 +48,54 @@ def test_upload_then_clear_manages_collection_state():
         )
 
         assert upload.status_code == 200
-        assert upload.json() == {"owned_count": 2}
+        assert upload.json() == {"owned_count": 2, "warnings": []}
         assert main.app.state.collection.quantity("sol ring") == 2
         assert main.app.state.collection.quantity("arcane signet") == 1
 
         assert client.post("/api/collection/clear").json() == {"status": "success"}
         assert client.get("/api/search").status_code == 400
+
+
+def test_upload_reports_warnings_for_skipped_rows():
+    main.clear_uploaded_collection()
+
+    with TestClient(main.app) as client:
+        upload = client.post(
+            "/api/collection/upload",
+            files={"file": ("collection.csv", b"Quantity,Name\n2,Sol Ring\n,\n1,Arcane Signet\n")},
+        )
+
+    assert upload.status_code == 200
+    body = upload.json()
+    assert body["owned_count"] == 2
+    assert len(body["warnings"]) == 1
+    assert "1 row(s)" in body["warnings"][0]
+
+
+def test_upload_rejects_file_with_no_parseable_rows():
+    main.clear_uploaded_collection()
+
+    with TestClient(main.app) as client:
+        upload = client.post(
+            "/api/collection/upload",
+            files={"file": ("collection.txt", b"not a valid line\nanother bad one\n")},
+        )
+
+    assert upload.status_code == 400
+    assert "collection.txt" in upload.json()["detail"]
+
+
+def test_upload_rejects_csv_with_wrong_columns():
+    main.clear_uploaded_collection()
+
+    with TestClient(main.app) as client:
+        upload = client.post(
+            "/api/collection/upload",
+            files={"file": ("collection.csv", b"Foo,Bar\n1,Sol Ring\n")},
+        )
+
+    assert upload.status_code == 400
+    assert "missing a name column" in upload.json()["detail"]
 
 
 def test_search_applies_filters_pagination_and_commander_presentation(monkeypatch):

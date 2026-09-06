@@ -258,7 +258,11 @@ export default function HomePage() {
     setLoading(true);
     try {
       const response = await uploadCollection(file);
-      setMessage(`${response.owned_count} unique cards loaded.`);
+      setMessage(
+        response.warnings?.length
+          ? `${response.owned_count} unique cards loaded. ${response.warnings.join(" ")}`
+          : `${response.owned_count} unique cards loaded.`
+      );
       await fetchPage(1);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Upload failed.");

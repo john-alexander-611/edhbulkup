@@ -51,6 +51,17 @@ make run-frontend
 
 The backend runs at `http://127.0.0.1:8001` and the frontend runs at `http://localhost:3000`.
 
+## Cache Refreshes
+
+The nightly GitHub Action builds the cache files and publishes them in the `latest-caches` GitHub Release. To make a deployed backend fetch the newest release at startup and poll for future releases, set these environment variables on that backend:
+
+```dotenv
+CACHE_AUTO_REFRESH=true
+CACHE_REFRESH_INTERVAL_SECONDS=10800
+```
+
+The backend atomically replaces its local cache files after it detects a new release, so in-flight requests keep using the previous files and later requests use the refreshed caches. `CACHE_REFRESH_INTERVAL_SECONDS` defaults to 10,800 seconds (three hours) and must be at least 60.
+
 The Make targets run these commands:
 
 ```powershell

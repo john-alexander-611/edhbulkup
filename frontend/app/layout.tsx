@@ -3,7 +3,7 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "EDH Bulk Up",
-  description: "Find commanders your collection can build and improve.",
+  description: "Find Decks Hidden in Your Bulk",
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

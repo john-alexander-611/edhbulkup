@@ -43,7 +43,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 export function uploadCollection(file: File) {
   const form = new FormData();
   form.append("file", file);
-  return request<{ owned_count: number }>(`/api/collection/upload`, { method: "POST", body: form });
+  return request<{ owned_count: number; warnings: string[] }>(`/api/collection/upload`, { method: "POST", body: form });
 }
 
 export function clearCollection() {

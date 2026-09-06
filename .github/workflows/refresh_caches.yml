@@ -25,6 +25,9 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Run tests
+        run: python -m pytest -q
+
       - name: Build Scryfall Cache
         run: python scryfall/build_scryfall_cache.py
 
@@ -33,6 +36,9 @@ jobs:
 
       - name: Build EDHREC Cache
         run: python create_cache/build_cache.py
+
+      - name: Test rebuilt caches
+        run: python -m pytest -q
 
       - name: Publish SQLite files to GitHub Release
         env:
@@ -49,4 +55,5 @@ jobs:
             --notes "Automated daily cache build" \
             scryfall_cache.sqlite \
             tag_cache.sqlite \
-            cache.sqlite
+            cache.sqlite \
+            create_cache/commander_data.json

@@ -36,13 +36,14 @@ def split_dfc_names(name: str) -> list[str]:
     return [normalize(name)]
 
 
-def parse_moxfield_csv(path_or_fileobj) -> dict[str, int]:
+def parse_moxfield_csv(path_or_fileobj, skipped: list[str] | None = None) -> dict[str, int]:
     """
     Returns {normalized_card_name: total_quantity_owned}.
 
     Accepts a file path (str) or an already-open file-like object. Supported
     exports must include a name column (``Name`` or ``Card Name``) and a
-    quantity column (``Count`` or ``Quantity``).
+    quantity column (``Count`` or ``Quantity``). If ``skipped`` is given, rows
+    missing a name or quantity are appended to it for warning purposes.
     """
     collection: dict[str, int] = defaultdict(int)
 
@@ -55,17 +56,24 @@ def parse_moxfield_csv(path_or_fileobj) -> dict[str, int]:
 
     try:
         reader = csv.DictReader(f)
-        name_header = next((header for header in NAME_HEADERS if header in reader.fieldnames), None)
+        fieldnames = reader.fieldnames or []
+        name_header = next((header for header in NAME_HEADERS if header in fieldnames), None)
         quantity_header = next(
-            (header for header in QUANTITY_HEADERS if header in reader.fieldnames), None
+            (header for header in QUANTITY_HEADERS if header in fieldnames), None
         )
         if not name_header or not quantity_header:
-            return {}
+            found = ", ".join(fieldnames) if fieldnames else "no columns"
+            raise ValueError(
+                f"CSV is missing a name column ({'/'.join(NAME_HEADERS)}) and/or a quantity "
+                f"column ({'/'.join(QUANTITY_HEADERS)}). Found columns: {found}."
+            )
 
-        for row in reader:
+        for row_number, row in enumerate(reader, start=2):
             raw_name = row.get(name_header)
             raw_count = row.get(quantity_header)
             if not raw_name or not raw_count:
+                if skipped is not None:
+                    skipped.append(f"row {row_number}: {row}")
                 continue
 
             try:
@@ -79,20 +87,34 @@ def parse_moxfield_csv(path_or_fileobj) -> dict[str, int]:
         if should_close:
             f.close()
 
+    if not collection:
+        raise ValueError("No card rows could be parsed from this CSV. Check that it has card names and quantities.")
+
     return dict(collection)
 
 
-def parse_plaintext_collection(fileobj) -> dict[str, int]:
-    """Parse ``quantity card name`` lines; trailing ``(set) collector-number`` and ``*F*`` are optional."""
+def parse_plaintext_collection(fileobj, skipped: list[str] | None = None) -> dict[str, int]:
+    """Parse ``quantity card name`` lines; trailing ``(set) collector-number`` and ``*F*`` are optional.
+
+    If ``skipped`` is given, non-blank lines that don't match the expected
+    format are appended to it for warning purposes.
+    """
     collection: dict[str, int] = defaultdict(int)
 
-    for line in fileobj:
+    for line_number, line in enumerate(fileobj, start=1):
         match = TEXT_COLLECTION_LINE.match(line)
         if not match:
+            if skipped is not None and line.strip():
+                skipped.append(f"line {line_number}: {line.strip()}")
             continue
 
         for key in split_dfc_names(match["name"]):
             collection[key] += int(match["quantity"])
+
+    if not collection:
+        raise ValueError(
+            "No card lines could be parsed from this file. Expected lines like '1 Sol Ring'."
+        )
 
     return dict(collection)
 

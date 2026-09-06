@@ -49,8 +49,9 @@
 .moreSuggestions:hover, .moreSuggestions:focus-visible { border-color: var(--accent); background: #30343a; }
 .missingCard { border-color: var(--danger); background: #3c2026; }
 .missingCard strong { color: #ffb0b4; }
-.decklist { columns: 2 320px; column-gap: 24px; padding: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
-.decklistGroup { break-inside: avoid; margin: 0 0 20px; }
+.decklist { display: flex; gap: 0 24px; padding: 18px; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; }
+.decklistColumn { flex: 1 1 320px; min-width: 0; }
+.decklistGroup { margin: 0 0 20px; }
 .decklistGroup h3 { margin: 0 0 6px; color: #dce0e5; font-size: 13px; }
 .decklistGroup ul { margin: 0; padding: 0; list-style: none; }
 .decklistCard { position: relative; display: flex; gap: 9px; align-items: baseline; padding: 4px 7px; color: #dce0e5; font-size: 13px; }
@@ -72,7 +73,7 @@
 	.backLink { font-size: 12px; }
 	.header { align-items: flex-start; padding: 14px; }
 	.commanderImage { width: 110px; }
-	.decklist { columns: 1; }
+	.decklist { flex-direction: column; }
 	.missingList { grid-template-columns: 1fr; }
 	.cardList { grid-template-columns: 1fr; }
 	.replacementHeader { flex-direction: column; gap: 12px; }

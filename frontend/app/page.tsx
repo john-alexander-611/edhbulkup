@@ -368,9 +368,9 @@ export default function HomePage() {
   }
 
   return (
-    <main className={styles.shell}>
-      <header className={styles.hero}>
-        <div className={styles.brand}>
+    <main className={styles.shell} data-testid="main-shell">
+      <header className={styles.hero} data-testid="hero-header">
+        <div className={styles.brand} data-testid="hero-brand">
           <Image
             className={styles.logo}
             src="/edh_bulk_up_logo_v3.png"
@@ -378,50 +378,51 @@ export default function HomePage() {
             width={360}
             height={180}
             priority
+            data-testid="hero-logo"
           />
-          <p className={styles.collectionStatus}>{file ? "Collection loaded" : "No collection loaded"}</p>
+          <p className={styles.collectionStatus} data-testid="collection-status">{file ? "Collection loaded" : "No collection loaded"}</p>
         </div>
-        <p className={styles.brandText}>Find Decks Hidden in Your Bulk</p>
+        <p className={styles.brandText} data-testid="hero-brand-text">Find Decks Hidden in Your Bulk</p>
         <div className={styles.heroSpacer} aria-hidden="true" />
       </header>
-      <section className={styles.workspace}>
-        <aside className={styles.controls}>
-          <form onSubmit={handleUpload} className={`${styles.card} ${styles.collectionCard}`}>
+      <section className={styles.workspace} data-testid="workspace-section">
+        <aside className={styles.controls} data-testid="controls-sidebar">
+          <form onSubmit={handleUpload} className={`${styles.card} ${styles.collectionCard}`} data-testid="collection-form">
             <h2>Collection</h2>
-            <input ref={fileInputRef} type="file" accept=".csv,.txt,text/plain" onChange={(event) => setFile(event.target.files?.[0] ?? null)} />
-            {file && <p className={styles.fileName}>Current File: {file.name}</p>}
-            <div className={styles.collectionActions}>
-              <button type="submit" disabled={!file || loading}>Upload Collection</button>
-              <button type="button" className={styles.sampleCollection} onClick={handleLoadSampleCollection} disabled={loading}>
+            <input ref={fileInputRef} type="file" accept=".csv,.txt,text/plain" onChange={(event) => setFile(event.target.files?.[0] ?? null)} data-testid="collection-file-input" />
+            {file && <p className={styles.fileName} data-testid="collection-file-name">Current File: {file.name}</p>}
+            <div className={styles.collectionActions} data-testid="collection-actions">
+              <button type="submit" disabled={!file || loading} data-testid="upload-collection-button">Upload Collection</button>
+              <button type="button" className={styles.sampleCollection} onClick={handleLoadSampleCollection} disabled={loading} data-testid="sample-collection-button">
                 {loading && !file ? "Loading Demo..." : "Try Sample Collection"}
               </button>
               {file && (
-                <button type="button" className={styles.clearCollection} onClick={handleClearCollection} disabled={loading}>
+                <button type="button" className={styles.clearCollection} onClick={handleClearCollection} disabled={loading} data-testid="clear-collection-button">
                   Clear Collection
                 </button>
               )}
             </div>
-            <div className={styles.sampleDownloadRow}>
-              <a href="/sample_collection.csv" download="sample_collection.csv" className={styles.sampleDownloadLink}>
+            <div className={styles.sampleDownloadRow} data-testid="sample-download-row">
+              <a href="/sample_collection.csv" download="sample_collection.csv" className={styles.sampleDownloadLink} data-testid="download-sample-csv-link">
                 Download sample CSV
               </a>
-              <a href="/sample_collection.txt" download="sample_collection.txt" className={styles.sampleDownloadLink}>
+              <a href="/sample_collection.txt" download="sample_collection.txt" className={styles.sampleDownloadLink} data-testid="download-sample-txt-link">
                 Download sample TXT
               </a>
             </div>
-            <p className={styles.hint}>{message}</p>
+            <p className={styles.hint} data-testid="collection-hint-message">{message}</p>
           </form>
-          <form onSubmit={handleSearch} className={`${styles.card} ${styles.filterCard}`}>
+          <form onSubmit={handleSearch} className={`${styles.card} ${styles.filterCard}`} data-testid="filter-form">
             <div className={styles.filterHeading}>
               <h2>Find commanders</h2>
             </div>
             <label className={`${styles.field} ${styles.searchField}`}>Search by name
               <div className={styles.commanderInputWrapper}>
-                <input value={commanderName} onChange={(event) => handleCommanderNameChange(event.target.value)} onFocus={() => commanderName && setShowSuggestions(true)} onBlur={() => setTimeout(() => setShowSuggestions(false), 200)} placeholder="Search commanders, e.g. Atraxa" />
+                <input value={commanderName} onChange={(event) => handleCommanderNameChange(event.target.value)} onFocus={() => commanderName && setShowSuggestions(true)} onBlur={() => setTimeout(() => setShowSuggestions(false), 200)} placeholder="Search commanders, e.g. Atraxa" data-testid="commander-search-input" />
                 {showSuggestions && suggestions.length > 0 && (
-                  <div className={styles.suggestions}>
+                  <div className={styles.suggestions} data-testid="commander-suggestions">
                     {suggestions.map((name) => (
-                      <div key={name} className={styles.suggestionItem} onClick={() => selectSuggestion(name)}>
+                      <div key={name} className={styles.suggestionItem} onClick={() => selectSuggestion(name)} data-testid={`commander-suggestion-${name}`}>
                         {name}
                       </div>
                     ))}
@@ -429,47 +430,47 @@ export default function HomePage() {
                 )}
               </div>
             </label>
-            <button className={styles.searchSubmit} type="submit" disabled={loading || !file}>Search commanders</button>
-            <div className={styles.filterOptions}>
-                <ColorGroup label="Exact Color Identity" values={identity} colorType="identity" onColorChange={handleColorToggle} />
-                <ColorGroup label="Contains Colors" values={contains} colorType="contains" onColorChange={handleColorToggle} />
-                <ColorGroup label="Exclude Colors" values={exclude} colorType="exclude" onColorChange={handleColorToggle} />
+            <button className={styles.searchSubmit} type="submit" disabled={loading || !file} data-testid="search-commanders-button">Search commanders</button>
+            <div className={styles.filterOptions} data-testid="filter-options">
+                <ColorGroup label="Exact Color Identity" values={identity} colorType="identity" onColorChange={handleColorToggle} testId="color-group-identity" />
+                <ColorGroup label="Contains Colors" values={contains} colorType="contains" onColorChange={handleColorToggle} testId="color-group-contains" />
+                <ColorGroup label="Exclude Colors" values={exclude} colorType="exclude" onColorChange={handleColorToggle} testId="color-group-exclude" />
                 <label className={styles.field}>Excluded commanders
                   <div className={styles.commanderInputWrapper}>
-                    <input value={excludeInput} onChange={(event) => handleExcludeInputChange(event.target.value)} onFocus={() => excludeInput && setShowExcludedSuggestions(true)} onBlur={() => setTimeout(() => setShowExcludedSuggestions(false), 200)} placeholder="Search commanders to exclude" />
+                    <input value={excludeInput} onChange={(event) => handleExcludeInputChange(event.target.value)} onFocus={() => excludeInput && setShowExcludedSuggestions(true)} onBlur={() => setTimeout(() => setShowExcludedSuggestions(false), 200)} placeholder="Search commanders to exclude" data-testid="exclude-commander-input" />
                     {showExcludedSuggestions && excludedSuggestions.length > 0 && (
-                      <div className={styles.suggestions}>
-                        {excludedSuggestions.map((name) => <div key={name} className={styles.suggestionItem} onClick={() => addExcludedCommander(name)}>{name}</div>)}
+                      <div className={styles.suggestions} data-testid="exclude-commander-suggestions">
+                        {excludedSuggestions.map((name) => <div key={name} className={styles.suggestionItem} onClick={() => addExcludedCommander(name)} data-testid={`exclude-commander-suggestion-${name}`}>{name}</div>)}
                       </div>
                     )}
                   </div>
-                  {excludedCommanders.length > 0 && <div className={styles.chipRow}>
-                    {excludedCommanders.map((name) => <span key={name} className={styles.chip}>{name}<button type="button" className={styles.chipRemove} onClick={() => removeExcludedCommander(name)} aria-label={`Remove ${name}`}>×</button></span>)}
+                  {excludedCommanders.length > 0 && <div className={styles.chipRow} data-testid="excluded-commanders-chips">
+                    {excludedCommanders.map((name) => <span key={name} className={styles.chip} data-testid={`excluded-chip-${name}`}>{name}<button type="button" className={styles.chipRemove} onClick={() => removeExcludedCommander(name)} aria-label={`Remove ${name}`} data-testid={`remove-excluded-chip-${name}`}>×</button></span>)}
                   </div>}
                 </label>
                 <label className={styles.field}>Advanced filters
-                  <div className={styles.colors}>
-                    <label title="Exclude the face commanders from precons"><input type="checkbox" checked={excludeFace} onChange={() => setExcludeFace((value) => !value)} /> Exclude Face Commanders</label>
-                    <label title="Exclude commmanders with partner"><input type="checkbox" checked={excludePartners} onChange={() => setExcludePartners((value) => !value)} /> Exclude Partner Commanders</label>
-                    <label title="Exclude any commanders you don't already own"><input type="checkbox" checked={onlyOwnedCommanders} onChange={() => setOnlyOwnedCommanders((value) => !value)} /> Only Owned Commanders</label>
+                  <div className={styles.colors} data-testid="advanced-filters">
+                    <label title="Exclude the face commanders from precons"><input type="checkbox" checked={excludeFace} onChange={() => setExcludeFace((value) => !value)} data-testid="exclude-face-checkbox" /> Exclude Face Commanders</label>
+                    <label title="Exclude commmanders with partner"><input type="checkbox" checked={excludePartners} onChange={() => setExcludePartners((value) => !value)} data-testid="exclude-partners-checkbox" /> Exclude Partner Commanders</label>
+                    <label title="Exclude any commanders you don't already own"><input type="checkbox" checked={onlyOwnedCommanders} onChange={() => setOnlyOwnedCommanders((value) => !value)} data-testid="only-owned-checkbox" /> Only Owned Commanders</label>
                   </div>
                 </label>
             </div>
           </form>
         </aside>
-        <section className={styles.results}>
-          <div className={styles.resultsHeader}><h2>Commander Matches</h2><span>{totalResults} results</span></div>
+        <section className={styles.results} data-testid="results-section">
+          <div className={styles.resultsHeader} data-testid="results-header"><h2>Commander Matches</h2><span data-testid="results-count">{totalResults} results</span></div>
           {results.length === 0 ? (
-            <div className={styles.empty}>
+            <div className={styles.empty} data-testid="empty-results">
               <p>Your commander matches will appear here.</p>
               {!file && (
-                <button type="button" className={styles.emptySampleBtn} onClick={handleLoadSampleCollection} disabled={loading}>
+                <button type="button" className={styles.emptySampleBtn} onClick={handleLoadSampleCollection} disabled={loading} data-testid="empty-sample-button">
                   {loading ? "Loading Demo..." : "Load Sample Collection to See Demo Matches"}
                 </button>
               )}
             </div>
           ) : results.map((result) => (
-            <Link className={styles.result} href={buildCommanderRoute(result.commander_name)} key={result.commander_name}>
+            <Link className={styles.result} href={buildCommanderRoute(result.commander_name)} key={result.commander_name} data-testid={`commander-result-${result.commander_name}`}>
               <div className={styles.resultImageWrap}>
                 {result.image_url ? (
                   <img
@@ -480,14 +481,15 @@ export default function HomePage() {
                       const target = event.currentTarget as HTMLImageElement;
                       target.style.display = "none";
                     }}
+                    data-testid={`commander-result-image-${result.commander_name}`}
                   />
                 ) : (
-                  <div className={styles.resultFallback}>Card</div>
+                  <div className={styles.resultFallback} data-testid={`commander-result-fallback-${result.commander_name}`}>Card</div>
                 )}
                 {result.image_url ? <img className={styles.resultPreview} src={result.image_url} alt="" /> : null}
               </div>
               <div className={styles.resultMeta}><h3>{result.commander_name}</h3><p>{result.owned_count} of {result.deck_size} cards owned</p></div>
-              <strong>{result.match_percentage.toFixed(1)}%</strong>
+              <strong data-testid={`commander-result-percentage-${result.commander_name}`}>{result.match_percentage.toFixed(1)}%</strong>
             </Link>
           ))}
           {totalResults > PAGE_SIZE && (
@@ -517,11 +519,11 @@ function Pagination({ page, totalPages, disabled, onPageChange }: { page: number
   }
 
   return (
-    <nav className={styles.pagination} aria-label="Result pages">
-      <button type="button" onClick={() => onPageChange(page - 1)} disabled={disabled || page <= 1}>Prev</button>
+    <nav className={styles.pagination} aria-label="Result pages" data-testid="pagination-nav">
+      <button type="button" onClick={() => onPageChange(page - 1)} disabled={disabled || page <= 1} data-testid="pagination-prev">Prev</button>
       {pageNumbers.map((entry, index) =>
         entry === "ellipsis" ? (
-          <span key={`ellipsis-${index}`} className={styles.paginationEllipsis}>…</span>
+          <span key={`ellipsis-${index}`} className={styles.paginationEllipsis} data-testid={`pagination-ellipsis-${index}`}>…</span>
         ) : (
           <button
             type="button"
@@ -529,20 +531,21 @@ function Pagination({ page, totalPages, disabled, onPageChange }: { page: number
             className={entry === page ? styles.paginationActive : undefined}
             onClick={() => onPageChange(entry)}
             disabled={disabled || entry === page}
+            data-testid={`pagination-page-${entry}`}
           >
             {entry}
           </button>
         )
       )}
-      <button type="button" onClick={() => onPageChange(page + 1)} disabled={disabled || page >= totalPages}>Next</button>
+      <button type="button" onClick={() => onPageChange(page + 1)} disabled={disabled || page >= totalPages} data-testid="pagination-next">Next</button>
     </nav>
   );
 }
 
-function ColorGroup({ label, values, colorType, onColorChange }: { label: string; values: string[]; colorType?: 'identity' | 'contains' | 'exclude'; onColorChange?: (color: string, type: 'identity' | 'contains' | 'exclude') => void }) {
+function ColorGroup({ label, values, colorType, onColorChange, testId }: { label: string; values: string[]; colorType?: 'identity' | 'contains' | 'exclude'; onColorChange?: (color: string, type: 'identity' | 'contains' | 'exclude') => void; testId?: string }) {
   const isIdentity = label === 'Exact Color Identity';
   const displayColors = isIdentity ? colors : colors.filter((c) => c !== 'C');
-  return <fieldset className={styles.colors}><legend>{label}</legend>{displayColors.map((color) => (
-    <label key={color} aria-label={color} title={colorNames[color] ?? color}><input type="checkbox" checked={values.includes(color)} onChange={() => onColorChange && colorType ? onColorChange(color, colorType) : undefined} /><img className={styles.manaSymbol} src={`/mana/${color}.svg`} alt={color} title={colorNames[color] ?? color} /></label>
+  return <fieldset className={styles.colors} data-testid={testId}><legend>{label}</legend>{displayColors.map((color) => (
+    <label key={color} aria-label={color} title={colorNames[color] ?? color}><input type="checkbox" checked={values.includes(color)} onChange={() => onColorChange && colorType ? onColorChange(color, colorType) : undefined} data-testid={`${testId}-${color}`} /><img className={styles.manaSymbol} src={`/mana/${color}.svg`} alt={color} title={colorNames[color] ?? color} /></label>
   ))}</fieldset>;
 }

@@ -111,6 +111,10 @@ export default function CommanderPage() {
     usd_price: analysis.usd_price ?? analysis.average_decklist.find((deckCard) => deckCard.name.toLowerCase() === analysis.commander_name.toLowerCase())?.usd_price ?? null,
     tcgplayer_id: analysis.tcgplayer_id ?? analysis.average_decklist.find((deckCard) => deckCard.name.toLowerCase() === analysis.commander_name.toLowerCase())?.tcgplayer_id ?? null,
   };
+  const commanderCards = (analysis.partner_commanders?.length
+    ? analysis.partner_commanders
+    : [commanderCard]
+  ).filter((card) => card.image_url);
 
   return <main className={styles.page} data-testid="commander-page">
     <header className={styles.appHeader} data-testid="app-header">
@@ -121,16 +125,19 @@ export default function CommanderPage() {
       <Link className={styles.backLink} href="/" data-testid="back-to-search-link">Back to search</Link>
     </header>
     <header className={styles.header} data-testid="commander-header">
-      {analysis.image_url ? <button
-        type="button"
-        className={styles.commanderImageButton}
-        onClick={() => setLightbox({ cards: [commanderCard], index: 0, title: "Commander" })}
-        aria-label={`View ${analysis.commander_name}`}
-        data-testid="commander-image-button"
-      >
-        <img className={styles.commanderImage} src={analysis.image_url} alt={analysis.commander_name} data-testid="commander-header-image" />
-        <img className={styles.commanderImagePreview} src={analysis.image_url} alt="" />
-      </button> : null}
+      {commanderCards.length ? <div className={styles.commanderImages} data-testid="commander-images">
+        {commanderCards.map((card, index) => <button
+          type="button"
+          className={styles.commanderImageButton}
+          onClick={() => setLightbox({ cards: commanderCards, index, title: "Commander" })}
+          aria-label={`View ${card.display_name}`}
+          data-testid={`commander-image-button-${card.name}`}
+          key={card.name}
+        >
+          <img className={styles.commanderImage} src={card.image_url!} alt={card.display_name} data-testid={`commander-header-image-${card.name}`} />
+          <img className={styles.commanderImagePreview} src={card.image_url!} alt="" />
+        </button>)}
+      </div> : null}
       <div className={styles.headerText} data-testid="commander-header-text">
         <p className={styles.eyebrow} data-testid="commander-identity">{analysis.identity} COMMANDER</p>
         <h1 data-testid="commander-name">{analysis.commander_name}</h1>

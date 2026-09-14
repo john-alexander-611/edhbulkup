@@ -65,6 +65,7 @@ class DeckAnalysisResponse(BaseModel):
     image_url: str | None = None
     usd_price: float | None = None
     tcgplayer_id: int | None = None
+    partner_commanders: list[CardPresentationResponse] = []
 
 
 class UploadCollectionResponse(BaseModel):

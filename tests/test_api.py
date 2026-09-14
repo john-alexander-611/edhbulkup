@@ -20,6 +20,19 @@ class FakeScryfallCache:
         pass
 
 
+class PartnerScryfallCache(FakeScryfallCache):
+    def get_card_display(self, card_name):
+        if " // " in card_name:
+            return {
+                "name": card_name.lower(),
+                "display_name": card_name,
+                "image_url": None,
+                "usd_price": None,
+                "tcgplayer_id": None,
+            }
+        return super().get_card_display(card_name)
+
+
 def make_deck(name, cards, identity="BR"):
     return Deck(Commander(name, identity), frozenset(cards))
 
@@ -37,6 +50,17 @@ def test_search_requires_an_uploaded_collection():
 
     assert response.status_code == 400
     assert response.json()["detail"] == "Upload a collection CSV before searching or analyzing commanders."
+
+
+def test_commander_analysis_route_accepts_encoded_partner_separator(monkeypatch):
+    partner_name = "Alena, Kessig Trapper // Kydele, Chosen of Kruphix"
+    monkeypatch.setattr(main, "get_decks", lambda: {})
+
+    with TestClient(main.app) as client:
+        response = client.get(f"/api/commanders/{partner_name.replace(' ', '%20').replace('/', '%2F')}")
+
+    assert response.status_code == 404
+    assert response.json()["detail"] == f"Commander not found: {partner_name}"
 
 
 def test_upload_then_clear_manages_collection_state():
@@ -130,3 +154,20 @@ def test_search_applies_filters_pagination_and_commander_presentation(monkeypatc
         ],
         "total": 2,
     }
+
+
+def test_search_uses_first_partner_image_when_pair_has_no_scryfall_record(monkeypatch):
+    partner_name = "Alena, Kessig Trapper // Kydele, Chosen of Kruphix"
+    main.app.state.collection = Collection({"shared": 1})
+    monkeypatch.setattr(main, "get_decks", lambda: {
+        partner_name: make_deck(partner_name, {"shared"}, "URG"),
+    })
+    monkeypatch.setattr(main, "ScryfallCache", PartnerScryfallCache)
+
+    with TestClient(main.app) as client:
+        response = client.get("/api/search")
+
+    assert response.status_code == 200
+    assert response.json()["results"][0]["image_url"] == (
+        "https://example.com/alena, kessig trapper.jpg"
+    )

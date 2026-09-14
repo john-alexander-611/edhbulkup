@@ -10,6 +10,7 @@
 .header { display: flex; align-items: center; gap: 22px; margin: 18px 0 34px; padding: 20px; background: var(--surface); border: 1px solid var(--border); border-radius: 7px; }
 .headerText { flex: 1; }
 .headerText > p:last-child { margin: 0; color: var(--text-muted); font-size: 14px; }
+.commanderImages { display: flex; flex-wrap: nowrap; gap: 10px; }
 .commanderImage { width: 156px; aspect-ratio: .72; object-fit: cover; border: 1px solid var(--border-strong); border-radius: 5px; background: var(--surface-input); box-shadow: 0 10px 20px rgba(0, 0, 0, .35); }
 .commanderImageLink, .commanderImageButton { position: relative; display: inline-block; background: none; border: 0; padding: 0; margin: 0; cursor: pointer; }
 .commanderImagePreview { display: none; position: absolute; z-index: 3; top: 50%; left: calc(100% + 16px); width: 380px; aspect-ratio: .72; object-fit: cover; border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 16px 36px rgba(0, 0, 0, .6); transform: translateY(-50%); }

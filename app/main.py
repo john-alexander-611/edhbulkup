@@ -4,11 +4,13 @@ import asyncio
 import io
 import logging
 import os
+import secrets
+import time
 from contextlib import asynccontextmanager, suppress
 from pathlib import Path
 
 import httpx
-from fastapi import FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import FastAPI, File, HTTPException, Query, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from download_caches import ensure_caches, get_latest_release_id
@@ -103,12 +105,56 @@ def get_allowed_origins() -> list[str]:
 
 
 app = FastAPI(title="EDH Bulk Up", version="0.1.0", lifespan=lifespan)
+SESSION_TTL_SECONDS = 60 * 60
+collections_by_session: dict[str, tuple[Collection, float]] = {}
+
+
+def session_is_expired(session_id: str) -> bool:
+    session = collections_by_session.get(session_id)
+    return session is not None and session[1] <= time.monotonic()
+
+
+def remove_expired_sessions() -> None:
+    for session_id in tuple(collections_by_session):
+        if session_is_expired(session_id):
+            collections_by_session.pop(session_id, None)
+
+
+@app.middleware("http")
+async def attach_session(request: Request, call_next):
+    remove_expired_sessions()
+    session_id = request.cookies.get("edh_session")
+    is_new_session = not session_id or session_is_expired(session_id)
+    if is_new_session:
+        session_id = secrets.token_urlsafe(32)
+    request.state.session_id = session_id
+
+    response = await call_next(request)
+    if is_new_session:
+        forwarded_proto = request.headers.get("x-forwarded-proto", "").split(",", 1)[0].strip().lower()
+        secure_cookie = (
+            request.url.scheme == "https"
+            or forwarded_proto == "https"
+            or os.getenv("SESSION_COOKIE_SECURE", "false").lower() in {"1", "true", "yes"}
+        )
+        response.set_cookie(
+            "edh_session",
+            session_id,
+            httponly=True,
+            max_age=SESSION_TTL_SECONDS,
+            samesite="none" if secure_cookie else "lax",
+            secure=secure_cookie,
+        )
+    return response
+
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=get_allowed_origins(),
     allow_origin_regex=r"https://.*\.vercel\.app|https://.*\.vercel\.app/.*",
     allow_methods=["*"],
     allow_headers=["*"],
+    allow_credentials=True,
     expose_headers=["*"],
 )
 
@@ -179,13 +225,17 @@ def get_partner_presentations(scryfall_cache: ScryfallCache, commander_name: str
     ]
 
 
-def get_uploaded_collection() -> Collection:
-    """Return the collection uploaded in this app session.
+def get_uploaded_collection(request: Request) -> Collection:
+    """Return the collection uploaded in the caller's session.
 
     Raises:
         HTTPException: 400 if no collection has been uploaded yet.
     """
-    collection = getattr(app.state, "collection", None)
+    session = collections_by_session.get(request.state.session_id)
+    if session_is_expired(request.state.session_id):
+        collections_by_session.pop(request.state.session_id, None)
+        session = None
+    collection = session[0] if session else None
     if collection is None:
         raise HTTPException(
             status_code=400,
@@ -193,10 +243,12 @@ def get_uploaded_collection() -> Collection:
         )
     return collection
 
-def clear_uploaded_collection() -> None:
-    """Remove the uploaded collection from app state, if present."""
-    if hasattr(app.state, "collection"):
-        delattr(app.state, "collection")
+def clear_uploaded_collection(session_id: str | None = None) -> None:
+    """Remove a session collection, or all collections when called by tests."""
+    if session_id is None:
+        collections_by_session.clear()
+    else:
+        collections_by_session.pop(session_id, None)
 
 
 @app.get("/health")
@@ -207,6 +259,7 @@ def health() -> dict[str, str]:
 
 @app.get("/api/search", response_model=SearchResultsResponse)
 def search_commanders(
+    request: Request,
     color: str | None = Query(default=None),
     identity: str | None = Query(default=None),
     contains: str | None = Query(default=None),
@@ -227,7 +280,7 @@ def search_commanders(
     Raises:
         HTTPException: 400 if no collection has been uploaded yet.
     """
-    collection = get_uploaded_collection()
+    collection = get_uploaded_collection(request)
     filters = []
 
     if name:
@@ -293,7 +346,7 @@ def commander_suggestions(q: str = Query(default="")):
 
 
 @app.get("/api/commanders/{commander_name:path}", response_model=DeckAnalysisResponse)
-async def commander_analysis(commander_name: str):
+async def commander_analysis(request: Request, commander_name: str):
     """Fetch EDHREC data for a commander and return a full analysis against the uploaded collection.
 
     Raises:
@@ -309,7 +362,7 @@ async def commander_analysis(commander_name: str):
 
         deck.set_categories(await fetch_commander_page_categories(client, deck.name))
 
-    collection = get_uploaded_collection()
+    collection = get_uploaded_collection(request)
     analysis = analyze_deck(deck, collection)
     scryfall_cache = ScryfallCache()
     tag_cache = TagCache()
@@ -395,8 +448,8 @@ async def commander_analysis(commander_name: str):
 
 
 @app.post("/api/collection/upload", response_model=UploadCollectionResponse)
-def upload_collection(file: UploadFile = File(...)):
-    """Parse an uploaded collection file (.txt plaintext or Moxfield CSV) and store it in app state.
+def upload_collection(request: Request, file: UploadFile = File(...)):
+    """Parse an uploaded collection file and store it in the caller's session.
 
     Raises:
         HTTPException: 400 if the file is empty, not valid UTF-8 text, or has no
@@ -431,7 +484,10 @@ def upload_collection(file: UploadFile = File(...)):
         )
 
     collection = Collection(parsed)
-    app.state.collection = collection
+    collections_by_session[request.state.session_id] = (
+        collection,
+        time.monotonic() + SESSION_TTL_SECONDS,
+    )
     return UploadCollectionResponse(
         owned_count=len(collection.names),
         sample_cards=sorted(collection.names)[:10],
@@ -439,9 +495,9 @@ def upload_collection(file: UploadFile = File(...)):
     )
     
 @app.post("/api/collection/clear")
-def clear_collection():
-    """Clear the uploaded collection from app state."""
-    clear_uploaded_collection()
+def clear_collection(request: Request):
+    """Clear the uploaded collection from the caller's session."""
+    clear_uploaded_collection(request.state.session_id)
     return {"status": "success"}
 
 

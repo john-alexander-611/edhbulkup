@@ -1,7 +1,6 @@
 from fastapi.testclient import TestClient
 
 import app.main as main
-from models.collection import Collection
 from models.commander import Commander
 from models.deck import Deck
 
@@ -74,11 +73,68 @@ def test_upload_then_clear_manages_collection_state():
 
         assert upload.status_code == 200
         assert upload.json() == {"owned_count": 2, "warnings": []}
-        assert main.app.state.collection.quantity("sol ring") == 2
-        assert main.app.state.collection.quantity("arcane signet") == 1
 
         assert client.post("/api/collection/clear").json() == {"status": "success"}
         assert client.get("/api/search").status_code == 400
+
+
+def test_collections_are_isolated_between_clients(monkeypatch):
+    decks = {
+        "Alpha": make_deck("Alpha", {"alpha"}),
+        "Beta": make_deck("Beta", {"beta"}),
+    }
+    monkeypatch.setattr(main, "get_decks", lambda: decks)
+    monkeypatch.setattr(main, "ScryfallCache", FakeScryfallCache)
+
+    with TestClient(main.app) as first_client, TestClient(main.app) as second_client:
+        first_client.post(
+            "/api/collection/upload",
+            files={"file": ("collection.csv", b"Quantity,Name\n1,Alpha\n")},
+        )
+        second_client.post(
+            "/api/collection/upload",
+            files={"file": ("collection.csv", b"Quantity,Name\n1,Beta\n")},
+        )
+
+        first_results = first_client.get("/api/search").json()["results"]
+        second_results = second_client.get("/api/search").json()["results"]
+
+    assert first_results[0]["commander_name"] == "Alpha"
+    assert second_results[0]["commander_name"] == "Beta"
+
+
+def test_collection_expires_after_session_ttl(monkeypatch):
+    current_time = [100.0]
+    monkeypatch.setattr(main.time, "monotonic", lambda: current_time[0])
+
+    with TestClient(main.app) as client:
+        upload = client.post(
+            "/api/collection/upload",
+            files={"file": ("collection.csv", b"Quantity,Name\n1,Sol Ring\n")},
+        )
+        assert upload.status_code == 200
+
+        current_time[0] += main.SESSION_TTL_SECONDS
+
+        assert client.get("/api/search").status_code == 400
+
+
+def test_https_session_cookie_allows_cross_site_requests():
+    with TestClient(main.app, base_url="https://testserver") as client:
+        response = client.get("/health")
+
+    cookie = response.headers["set-cookie"].lower()
+    assert "samesite=none" in cookie
+    assert "secure" in cookie
+
+
+def test_forwarded_https_session_cookie_allows_cross_site_requests():
+    with TestClient(main.app) as client:
+        response = client.get("/health", headers={"x-forwarded-proto": "https"})
+
+    cookie = response.headers["set-cookie"].lower()
+    assert "samesite=none" in cookie
+    assert "secure" in cookie
 
 
 def test_upload_reports_warnings_for_skipped_rows():
@@ -124,7 +180,6 @@ def test_upload_rejects_csv_with_wrong_columns():
 
 
 def test_search_applies_filters_pagination_and_commander_presentation(monkeypatch):
-    main.app.state.collection = Collection({"shared": 1})
     decks = {
         "Alpha Mage": make_deck("Alpha Mage", {"shared", "alpha"}, "U"),
         "Alpha Dragon": make_deck("Alpha Dragon", {"shared"}, "R"),
@@ -134,6 +189,10 @@ def test_search_applies_filters_pagination_and_commander_presentation(monkeypatc
     monkeypatch.setattr(main, "ScryfallCache", FakeScryfallCache)
 
     with TestClient(main.app) as client:
+        client.post(
+            "/api/collection/upload",
+            files={"file": ("collection.csv", b"Quantity,Name\n1,Shared\n")},
+        )
         response = client.get(
             "/api/search",
             params={"name": "alpha", "limit": 1, "offset": 1},
@@ -158,13 +217,16 @@ def test_search_applies_filters_pagination_and_commander_presentation(monkeypatc
 
 def test_search_uses_first_partner_image_when_pair_has_no_scryfall_record(monkeypatch):
     partner_name = "Alena, Kessig Trapper // Kydele, Chosen of Kruphix"
-    main.app.state.collection = Collection({"shared": 1})
     monkeypatch.setattr(main, "get_decks", lambda: {
         partner_name: make_deck(partner_name, {"shared"}, "URG"),
     })
     monkeypatch.setattr(main, "ScryfallCache", PartnerScryfallCache)
 
     with TestClient(main.app) as client:
+        client.post(
+            "/api/collection/upload",
+            files={"file": ("collection.csv", b"Quantity,Name\n1,Shared\n")},
+        )
         response = client.get("/api/search")
 
     assert response.status_code == 200

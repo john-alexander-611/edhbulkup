@@ -49,7 +49,7 @@ make run-backend
 make run-frontend
 ```
 
-The backend runs at `http://127.0.0.1:8001` and the frontend runs at `http://localhost:3000`.
+The backend runs at `http://localhost:8001` and the frontend runs at `http://localhost:3000`.
 
 ## Cache Refreshes
 
@@ -112,7 +112,7 @@ This excludes standalone cache-building scripts from the metric while reporting 
 
 ## API configuration
 
-The frontend reads `NEXT_PUBLIC_API_BASE_URL` from `frontend/.env.local`; it defaults to `http://127.0.0.1:8001`. To use an overridden backend port, add this line to `frontend/.env.local`:
+The frontend reads `NEXT_PUBLIC_API_BASE_URL` from `frontend/.env.local`; it defaults to `http://localhost:8001`. To use an overridden backend port, add this line to `frontend/.env.local`:
 
 ```dotenv
 NEXT_PUBLIC_API_BASE_URL=http://127.0.0.1:8002

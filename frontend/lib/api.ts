@@ -1,4 +1,4 @@
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8001";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:8001";
 
 export const apiBaseUrl = API_BASE_URL.replace(/\/$/, "");
 
@@ -35,7 +35,7 @@ export type SearchFilters = {
 };
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${apiBaseUrl}${path}`, init);
+  const response = await fetch(`${apiBaseUrl}${path}`, { ...init, credentials: "include" });
   const body = await response.json();
   if (!response.ok) throw new Error(body.detail ?? "The API request failed.");
   return body as T;

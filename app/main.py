@@ -161,6 +161,24 @@ def build_card_details(cards: list[str] | tuple[str, ...], lookup):
     ]
 
 
+def get_commander_presentation(scryfall_cache: ScryfallCache, commander_name: str):
+    """Return commander metadata, falling back to the first partner's card image."""
+    commander_meta = scryfall_cache.get_card_display(commander_name)
+    if commander_meta["image_url"] or " // " not in commander_name:
+        return commander_meta
+    return scryfall_cache.get_card_display(commander_name.split(" // ", 1)[0])
+
+
+def get_partner_presentations(scryfall_cache: ScryfallCache, commander_name: str):
+    """Return individual card metadata for a partner commander pair."""
+    if " // " not in commander_name:
+        return []
+    return [
+        scryfall_cache.get_card_display(partner_name)
+        for partner_name in commander_name.split(" // ")
+    ]
+
+
 def get_uploaded_collection() -> Collection:
     """Return the collection uploaded in this app session.
 
@@ -249,7 +267,9 @@ def search_commanders(
     try:
         serialized_matches = []
         for result in matches:
-            commander_meta = scryfall_cache.get_card_display(result.commander_name)
+            commander_meta = get_commander_presentation(
+                scryfall_cache, result.commander_name
+            )
             serialized_matches.append(
                 DeckMatchResponse(
                     commander_name=result.commander_name,
@@ -272,7 +292,7 @@ def commander_suggestions(q: str = Query(default="")):
     return {"suggestions": get_commander_suggestions(q, limit=15)}
 
 
-@app.get("/api/commanders/{commander_name}", response_model=DeckAnalysisResponse)
+@app.get("/api/commanders/{commander_name:path}", response_model=DeckAnalysisResponse)
 async def commander_analysis(commander_name: str):
     """Fetch EDHREC data for a commander and return a full analysis against the uploaded collection.
 
@@ -342,7 +362,10 @@ async def commander_analysis(commander_name: str):
                     "replacement_details": replacement_details,
                 }
             )
-        commander_meta = scryfall_cache.get_card_display(analysis.commander_name)
+        commander_meta = get_commander_presentation(scryfall_cache, analysis.commander_name)
+        partner_commanders = get_partner_presentations(
+            scryfall_cache, analysis.commander_name
+        )
     finally:
         scryfall_cache.close()
         tag_cache.close()
@@ -367,6 +390,7 @@ async def commander_analysis(commander_name: str):
         image_url=commander_meta["image_url"],
         usd_price=commander_meta.get("usd_price"),
         tcgplayer_id=commander_meta.get("tcgplayer_id"),
+        partner_commanders=partner_commanders,
     )
 
 

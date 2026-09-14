@@ -110,8 +110,26 @@ export default function HomePage() {
             try {
               const response = await uploadCollection(recovered);
               setMessage(`${response.owned_count} unique cards loaded.`);
+              const { results: matches, total } = await searchCommanders({
+                name: session.commanderName ?? "",
+                identity: (session.identity ?? []).join(""),
+                contains: (session.contains ?? []).join(""),
+                exclude: (session.exclude ?? []).join(""),
+                exclude_commanders: session.excludedCommanders ?? [],
+                exclude_face: session.excludeFace ?? true,
+                exclude_partners: session.excludePartners ?? true,
+                only_owned_commanders: session.onlyOwnedCommanders ?? true,
+                limit: PAGE_SIZE,
+                offset: 0,
+              });
+              if (!Array.isArray(matches) || typeof total !== "number") {
+                throw new Error("The search API returned an invalid response.");
+              }
+              setResults(matches);
+              setTotalResults(total);
+              setPage(1);
             } catch (error) {
-              setMessage(error instanceof Error ? error.message : "Upload failed.");
+              setMessage(error instanceof Error ? error.message : "Unable to restore saved collection.");
             }
           }
         })();
@@ -392,7 +410,7 @@ export default function HomePage() {
             <input ref={fileInputRef} type="file" accept=".csv,.txt,text/plain" onChange={(event) => setFile(event.target.files?.[0] ?? null)} data-testid="collection-file-input" />
             {file && <p className={styles.fileName} data-testid="collection-file-name">Current File: {file.name}</p>}
             <div className={styles.collectionActions} data-testid="collection-actions">
-              <button type="submit" disabled={!file || loading} data-testid="upload-collection-button">Upload Collection</button>
+              <button type="submit" disabled={hydrated && (!file || loading)} data-testid="upload-collection-button">Upload Collection</button>
               <button type="button" className={styles.sampleCollection} onClick={handleLoadSampleCollection} disabled={loading} data-testid="sample-collection-button">
                 {loading && !file ? "Loading Demo..." : "Try Sample Collection"}
               </button>
@@ -430,7 +448,7 @@ export default function HomePage() {
                 )}
               </div>
             </label>
-            <button className={styles.searchSubmit} type="submit" disabled={loading || !file} data-testid="search-commanders-button">Search commanders</button>
+            <button className={styles.searchSubmit} type="submit" disabled={hydrated && (loading || !file)} data-testid="search-commanders-button">Search commanders</button>
             <div className={styles.filterOptions} data-testid="filter-options">
                 <ColorGroup label="Exact Color Identity" values={identity} colorType="identity" onColorChange={handleColorToggle} testId="color-group-identity" />
                 <ColorGroup label="Contains Colors" values={contains} colorType="contains" onColorChange={handleColorToggle} testId="color-group-contains" />

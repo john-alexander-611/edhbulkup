@@ -235,12 +235,42 @@ async def fetch_commanders_by_identity(client: httpx.AsyncClient, identity: str)
     # fall back to scanning container cardlists if that's empty.
     top_level = data.get("cardlist") or []
     if top_level:
-        results = []
-        for view in top_level:
-            name = view.get("name")
-            if not name:
-                continue
-            results.append({"name": name, "num_decks": view.get("num_decks")})
-        return results
+        results = [
+            {"name": view["name"], "num_decks": view.get("num_decks")}
+            for view in top_level
+            if view.get("name")
+        ]
+    else:
+        results = _extract_cardviews(data)
 
-    return _extract_cardviews(data)
+    results.extend(await _fetch_remaining_commander_pages(client, data))
+    return results
+
+
+async def _fetch_remaining_commander_pages(client: httpx.AsyncClient, first_page: dict) -> list[dict]:
+    """Fetch pages 1..N-1 of a paginated commander list; the first page only holds the top ~100.
+
+    Later pages are named like the first page's "more" path with the trailing page index
+    incremented, and each holds {"cardviews": [...]}.
+    """
+    try:
+        cardlists = first_page["container"]["json_dict"].get("cardlists") or []
+    except (KeyError, TypeError):
+        return []
+
+    more = next((cl.get("more") for cl in cardlists if cl.get("more")), None)
+    total_pages = next((cl.get("total_pages") for cl in cardlists if cl.get("total_pages")), 1)
+    if not more or not more.endswith("-1.json"):
+        return []
+
+    base = more[: -len("-1.json")]
+    results = []
+    for page in range(1, total_pages):
+        data = await fetch_json(client, f"{base}-{page}.json")
+        if data is None:
+            continue
+        for view in data.get("cardviews") or []:
+            name = view.get("name")
+            if name:
+                results.append({"name": name, "num_decks": view.get("num_decks")})
+    return results
